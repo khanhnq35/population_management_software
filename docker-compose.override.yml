@@ -1,0 +1,7 @@
+services:
+  frontend:
+    environment:
+      VITE_HOST: 0.0.0.0
+      VITE_PORT: 5173
+      VITE_PROXY_TARGET: http://backend:8000
+    command: npm run dev -- --host 0.0.0.0 --port 5173 --strictPort

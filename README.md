@@ -121,6 +121,10 @@ chmod +x test_local.sh
 
 This script automatically builds, runs, and verifies the Docker Compose stack, performs API smoke tests, and opens the frontend once everything is healthy.
 
+### Changelog Automation
+- `./test_local.sh` automatically records its execution in the `Unreleased` section of `CHANGELOG.md`.
+- Run `scripts/install_hooks.sh` once after cloning to enable git hooks that promote `Unreleased` notes into a new version on every commit.
+
 ## API Overview (Base URL: `/api`)
 - `POST /auth/login` – obtain JWT access token
 - `POST /auth/register` – create a user (admin-only after first account)

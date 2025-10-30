@@ -13,6 +13,13 @@ DB_NAME="population_db"
 mkdir -p "${LOG_DIR}"
 echo "==== LOCAL TEST STARTED at $(date) ====" > "${LOG_FILE}"
 
+if git rev-parse --is-inside-work-tree >> "${LOG_FILE}" 2>&1; then
+  current_hooks_path=$(git config --get core.hooksPath 2>/dev/null || echo "")
+  if [[ "${current_hooks_path}" != "scripts/git-hooks" ]]; then
+    git config core.hooksPath scripts/git-hooks >> "${LOG_FILE}" 2>&1 || warn "⚠️ Unable to configure git hooks path"
+  fi
+fi
+
 RED="\033[31m"
 GREEN="\033[32m"
 YELLOW="\033[33m"
@@ -92,21 +99,21 @@ wait_for_database() {
   fail "PostgreSQL not ready"
 }
 
-echo "[1/6] 🧹 Stopping old containers..." | tee -a "${LOG_FILE}"
+echo "[1/7] 🧹 Stopping old containers..." | tee -a "${LOG_FILE}"
 if ! docker-compose down >> "${LOG_FILE}" 2>&1; then
   warn "⚠️ docker-compose down returned a non-zero status (continuing)"
 fi
 
-echo "[2/6] 🏗️  Building and starting containers..." | tee -a "${LOG_FILE}"
+echo "[2/7] 🏗️  Building and starting containers..." | tee -a "${LOG_FILE}"
 run_or_fail "Failed to build and start containers" docker-compose up -d --build
 
-echo "[3/6] ⏳ Waiting for backend & DB to be ready..." | tee -a "${LOG_FILE}"
+echo "[3/7] ⏳ Waiting for backend & DB to be ready..." | tee -a "${LOG_FILE}"
 sleep 15
 wait_for_backend_ready
 wait_for_database
 
 
-echo "[4/6] 🔍 Checking services..." | tee -a "${LOG_FILE}"
+echo "[4/7] 🔍 Checking services..." | tee -a "${LOG_FILE}"
 if curl -sf "${BACKEND_URL}/docs" > /dev/null; then
   success "✅ Backend docs available"
 else
@@ -115,33 +122,38 @@ fi
 wait_for_frontend_ready
 
 
-echo "[5/6] 🧪 Testing API endpoints..." | tee -a "${LOG_FILE}"
-LOGIN_TMP=$(mktemp)
-REGISTER_TMP=$(mktemp)
-trap 'rm -f "${LOGIN_TMP}" "${REGISTER_TMP}"' EXIT
-
-LOGIN_STATUS=$(curl -s -o "${LOGIN_TMP}" -w "%{http_code}" -X POST "${BACKEND_URL}/api/auth/login" \
+echo "[5/7] 🧪 Testing API endpoints..." | tee -a "${LOG_FILE}"
+LOGIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BACKEND_URL}/api/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "Admin@123"}')
+LOGIN_STATUS=$(echo "${LOGIN_RESPONSE}" | tail -n1)
+LOGIN_BODY=$(echo "${LOGIN_RESPONSE}" | sed '$d')
 
 echo "Admin login status: ${LOGIN_STATUS}" >> "${LOG_FILE}"
 if [[ "${LOGIN_STATUS}" != "200" ]]; then
   fail "Unable to log in with default admin user"
 fi
 
-ADMIN_TOKEN=$(python3 - <<'PY'
-import json, sys
-with open(sys.argv[1], 'r', encoding='utf-8') as fh:
-    data = json.load(fh)
-print(data.get('access_token', ''))
+ADMIN_TOKEN=$(LOGIN_BODY="${LOGIN_BODY}" python3 - <<'PY'
+import json
+import os
+import sys
+
+body = os.environ.get("LOGIN_BODY", "")
+try:
+    data = json.loads(body)
+    token = data.get("access_token", "")
+except json.JSONDecodeError as exc:  # pragma: no cover - runtime feedback
+    raise SystemExit(f"Failed to decode login response: {exc}") from exc
+
+if not token:
+    raise SystemExit("Empty access token in login response")
+
+print(token, end="")
 PY
-"${LOGIN_TMP}")
+)
 
-if [[ -z "${ADMIN_TOKEN}" ]]; then
-  fail "Could not extract admin access token"
-fi
-
-REGISTER_STATUS=$(curl -s -o "${REGISTER_TMP}" -w "%{http_code}" -X POST "${BACKEND_URL}/api/auth/register" \
+REGISTER_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${BACKEND_URL}/api/auth/register" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${ADMIN_TOKEN}" \
   -d '{"username": "testuser", "password": "Test1234", "full_name": "Test User", "role": "ke_toan"}')
@@ -158,7 +170,7 @@ else
 fi
 
 
-echo "[6/6] 🚀 Opening frontend..." | tee -a "${LOG_FILE}"
+echo "[6/7] 🚀 Opening frontend..." | tee -a "${LOG_FILE}"
 if command -v open >/dev/null 2>&1; then
   open "${FRONTEND_URL}" >> "${LOG_FILE}" 2>&1 || warn "⚠️ Could not auto-open browser with open"
 elif command -v xdg-open >/dev/null 2>&1; then
@@ -166,6 +178,9 @@ elif command -v xdg-open >/dev/null 2>&1; then
 else
   warn "⚠️ No known browser opening command available"
 fi
+
+echo "[7/7] 📝 Recording test run in CHANGELOG..." | tee -a "${LOG_FILE}"
+run_or_fail "Failed to update changelog" python3 scripts/update_changelog.py pipeline --message "Local test pipeline succeeded"
 
 echo "==== LOCAL TEST COMPLETED SUCCESSFULLY ====" >> "${LOG_FILE}"
 success "✅ All services healthy! Logs saved in ${LOG_FILE}"

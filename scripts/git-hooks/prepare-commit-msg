@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HOOK_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(cd "${HOOK_DIR}/../.." && pwd)
+MSG_FILE=$1
+COMMIT_SOURCE=${2-}
+
+# Skip auto updates for merge commits or commits without working tree
+if [[ "${COMMIT_SOURCE}" == "merge" ]]; then
+  exit 0
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 not available; skipping changelog update" >&2
+  exit 0
+fi
+
+COMMIT_MESSAGE=$(cat "${MSG_FILE}" 2>/dev/null || echo "")
+
+python3 "${REPO_ROOT}/scripts/update_changelog.py" release --message "${COMMIT_MESSAGE}"
+
+git -C "${REPO_ROOT}" add CHANGELOG.md
