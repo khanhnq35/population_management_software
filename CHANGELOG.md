@@ -3,6 +3,9 @@
 All notable changes to this project will be documented in this file following [Keep a Changelog](https://keepachangelog.com/) guidelines.
 
 ## [Unreleased]
+- _No unreleased changes yet_
+
+## [v0.4.1] - 2025-10-30
 - Local test pipeline succeeded (2025-10-30 19:20)
 - Local test pipeline succeeded (2025-10-30 20:40)
 
