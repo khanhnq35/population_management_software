@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file following [Keep a Changelog](https://keepachangelog.com/) guidelines.
 
 ## [Unreleased]
-- _No unreleased changes yet_
+- Local test pipeline succeeded (2025-12-26 22:27)
 
 ## [v0.4.2] - 2025-10-30
 - feat: added automated local testing pipeline (test_local.sh)

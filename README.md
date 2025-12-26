@@ -47,54 +47,57 @@ population_management_software/
 
 ## Getting Started
 
-### Prerequisites
-- Node.js 18+
-- Python 3.11+
-- Docker & Docker Compose (for containerized run)
+### 1. Install prerequisites
+- **Node.js 18+**
+- **Python 3.11+**
+- **Docker Desktop** (includes Docker Compose v2)
 
-### Environment Variables
-Copy the provided sample and adjust values as needed:
+Make sure Docker Desktop is running before executing any container commands.
+
+### 2. Clone repo & prepare environment variables
 ```bash
+git clone https://github.com/khanhnq35/population_management_software
+cd population_management_software
 cp .env.example .env
 ```
 
-Key variables:
-- `DATABASE_URL` – connection string for PostgreSQL
-- `JWT_SECRET` – secret key for signing JWT tokens
-- `JWT_ALGORITHM` – usually `HS256`
-- `ACCESS_TOKEN_EXPIRE_MINUTES` – token lifetime
+The `.env` file is loaded by Docker and by the backend when running locally. Update values if needed:
+- `DATABASE_URL` – Postgres DSN (defaults to `postgresql://admin:123456@db:5432/population_db` for Docker).
+- `JWT_SECRET`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` – auth configuration.
 
-### Run with Docker Compose
+### 3. Backend virtualenv (for local-only dev or Alembic migrations)
 ```bash
-docker-compose up --build
+cd backend
+python -m venv .venv
+source .venv/bin/activate            # .venv\Scripts\activate on Windows
+pip install --upgrade pip
+pip install -r requirements.txt
+alembic upgrade head                 # applies DB migrations to DATABASE_URL
 ```
-Services start at:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8000/api
-- PostgreSQL: localhost:5432 (credentials in `docker-compose.yml`)
+> When you only rely on Docker you can skip the venv and let the containers run Alembic during `./test_local.sh`, but having the venv ready helps with IDE tooling and manual testing.
 
-To stop:
+### 4. Manual local dev servers
+- **Backend** (expects DATABASE_URL in `.env`): `uvicorn app.main:app --reload`
+- **Frontend**: from `frontend/` run `npm install` once, then `npm run dev`
+
+### 5. One-click Docker workflow with `./test_local.sh`
+The script reproduces production-like behavior and runs smoke tests automatically. It performs:
+1. Stop & clean any existing project containers/networks.
+2. Build frontend/backend images.
+3. Start PostgreSQL, backend, and Vite dev server in Docker.
+4. Wait for the API health check (`/api/health`) and for Postgres readiness.
+5. Verify FastAPI docs and the frontend endpoint.
+6. Run backend smoke tests and write results to `logs/test_local.log`.
+
+Usage:
 ```bash
-docker-compose down
+chmod +x test_local.sh
+./test_local.sh
 ```
-
-### Manual Local Development
-1. **Backend**
-   ```bash
-   cd backend
-   python -m venv .venv
-   source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-   pip install -r requirements.txt
-   alembic upgrade head
-   uvicorn app.main:app --reload
-   ```
-
-2. **Frontend**
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+Troubleshooting tips:
+- Ensure Docker Desktop is running and your user can access the Docker socket (`~/.docker/run/docker.sock` on macOS).
+- If the script stops at “Frontend did not respond”, check `docker-compose logs frontend` for errors (e.g., missing PostCSS config).
+- Logs for each run live in `logs/test_local.log` for auditing.
 
 ### Database Migrations
 Create new migrations via Alembic:
