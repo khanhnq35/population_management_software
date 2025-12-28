@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from ..core.db import get_db
 from ..core.dependencies import require_roles
 from ..models.hogiadinh import HoGiaDinh
 from ..schemas.hogiadinh import HoGiaDinhCreate, HoGiaDinhOut, HoGiaDinhUpdate
+from ..services.excel_service import create_excel_file, read_excel_file
 
 router = APIRouter(prefix="/hogiadinh", tags=["hogiadinh"])
 
@@ -76,3 +77,77 @@ def delete_household(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Household not found")
     db.delete(household)
     db.commit()
+
+
+@router.post("/import", status_code=status.HTTP_200_OK)
+def import_households(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: object = Depends(require_roles("admin", "to_truong")),
+) -> dict[str, int]:
+    """Import households from Excel file."""
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File must be Excel format (.xlsx or .xls)")
+    
+    content = file.file.read()
+    data = read_excel_file(content)
+    
+    imported = 0
+    errors = 0
+    
+    for row in data:
+        try:
+            household_code = str(row.get("household_code", "")).strip()
+            if not household_code:
+                errors += 1
+                continue
+            
+            # Check if already exists
+            existing = db.query(HoGiaDinh).filter(HoGiaDinh.household_code == household_code).first()
+            if existing:
+                errors += 1
+                continue
+            
+            household = HoGiaDinh(
+                household_code=household_code,
+                address=str(row.get("address", "")).strip(),
+                head_of_household=str(row.get("head_of_household", "")).strip(),
+                established_date=row.get("established_date") if row.get("established_date") else None,
+            )
+            db.add(household)
+            imported += 1
+        except Exception:
+            errors += 1
+            continue
+    
+    db.commit()
+    return {"imported": imported, "errors": errors}
+
+
+@router.get("/export")
+def export_households(
+    db: Session = Depends(get_db),
+    _: object = Depends(require_roles("admin", "to_truong")),
+) -> Response:
+    """Export households to Excel file."""
+    households = db.query(HoGiaDinh).order_by(HoGiaDinh.created_at.desc()).all()
+    
+    headers = ["household_code", "address", "head_of_household", "established_date", "created_at"]
+    data = [
+        {
+            "household_code": h.household_code,
+            "address": h.address,
+            "head_of_household": h.head_of_household,
+            "established_date": h.established_date.isoformat() if h.established_date else "",
+            "created_at": h.created_at.isoformat() if h.created_at else "",
+        }
+        for h in households
+    ]
+    
+    excel_file = create_excel_file(headers, data)
+    
+    return Response(
+        content=excel_file.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=households.xlsx"},
+    )

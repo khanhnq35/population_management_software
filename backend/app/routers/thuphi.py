@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -8,6 +8,7 @@ from ..models.payment import Payment
 from ..models.thuphi import ThuPhi
 from ..schemas.payment import PaymentCreate, PaymentOut
 from ..schemas.thuphi import ThuPhiCreate, ThuPhiOut, ThuPhiUpdate
+from ..services.excel_service import create_excel_file, read_excel_file
 
 router = APIRouter(prefix="/thuphi", tags=["thuphi"])
 
@@ -83,9 +84,18 @@ def record_payment(
     db: Session = Depends(get_db),
     _: object = Depends(require_roles("admin", "ke_toan")),
 ) -> PaymentOut:
+    from ..models.hogiadinh import HoGiaDinh
+    
     fee = db.query(ThuPhi).filter(ThuPhi.id == fee_id).first()
     if fee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee not found")
+    
+    # Validate household_code if provided
+    if data.household_code:
+        household = db.query(HoGiaDinh).filter(HoGiaDinh.household_code == data.household_code).first()
+        if household is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Household code does not exist")
+    
     payment = Payment(
         citizen_name=data.citizen_name,
         household_code=data.household_code,
@@ -113,3 +123,117 @@ def fee_statistics(db: Session = Depends(get_db)) -> dict[str, float]:
         "collected_total": float(total_collected),
         "outstanding": float(total_fees - total_collected),
     }
+
+
+@router.post("/import", status_code=status.HTTP_200_OK)
+def import_fees(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: object = Depends(require_roles("admin", "ke_toan")),
+) -> dict[str, int]:
+    """Import fees from Excel file."""
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File must be Excel format (.xlsx or .xls)")
+    
+    content = file.file.read()
+    data = read_excel_file(content)
+    
+    imported = 0
+    errors = 0
+    
+    for row in data:
+        try:
+            name = str(row.get("name", "")).strip()
+            if not name:
+                errors += 1
+                continue
+            
+            amount = float(row.get("amount", 0))
+            if amount < 0:
+                errors += 1
+                continue
+            
+            # Parse date if provided
+            due_date = None
+            due_date_str = row.get("due_date")
+            if due_date_str:
+                if isinstance(due_date_str, str):
+                    from datetime import datetime
+                    due_date = datetime.fromisoformat(due_date_str.split("T")[0]).date()
+            
+            fee = ThuPhi(
+                name=name,
+                description=str(row.get("description", "")).strip() if row.get("description") else None,
+                amount=amount,
+                due_date=due_date,
+            )
+            db.add(fee)
+            imported += 1
+        except Exception:
+            errors += 1
+            continue
+    
+    db.commit()
+    return {"imported": imported, "errors": errors}
+
+
+@router.get("/export")
+def export_fees(
+    db: Session = Depends(get_db),
+    _: object = Depends(require_roles("admin", "ke_toan")),
+) -> Response:
+    """Export fees to Excel file."""
+    fees = db.query(ThuPhi).order_by(ThuPhi.created_at.desc()).all()
+    
+    headers = ["name", "description", "amount", "due_date", "created_at"]
+    data = [
+        {
+            "name": f.name,
+            "description": f.description or "",
+            "amount": f.amount,
+            "due_date": f.due_date.isoformat() if f.due_date else "",
+            "created_at": f.created_at.isoformat() if f.created_at else "",
+        }
+        for f in fees
+    ]
+    
+    excel_file = create_excel_file(headers, data)
+    
+    return Response(
+        content=excel_file.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=fees.xlsx"},
+    )
+
+
+@router.get("/{fee_id}/payments/export")
+def export_payments(
+    fee_id: int,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_roles("admin", "ke_toan")),
+) -> Response:
+    """Export payments for a specific fee to Excel file."""
+    fee = db.query(ThuPhi).filter(ThuPhi.id == fee_id).first()
+    if fee is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee not found")
+    
+    payments = db.query(Payment).filter(Payment.fee_id == fee_id).order_by(Payment.payment_date.desc()).all()
+    
+    headers = ["citizen_name", "household_code", "amount_paid", "payment_date"]
+    data = [
+        {
+            "citizen_name": p.citizen_name,
+            "household_code": p.household_code or "",
+            "amount_paid": p.amount_paid,
+            "payment_date": p.payment_date.isoformat() if p.payment_date else "",
+        }
+        for p in payments
+    ]
+    
+    excel_file = create_excel_file(headers, data)
+    
+    return Response(
+        content=excel_file.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=payments_{fee_id}.xlsx"},
+    )
