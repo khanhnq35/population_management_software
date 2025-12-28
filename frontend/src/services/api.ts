@@ -57,6 +57,27 @@ export const householdsApi = {
   async create(payload: Record<string, unknown>) {
     const { data } = await apiClient.post("/hogiadinh", payload);
     return data;
+  },
+  async delete(id: number) {
+    await apiClient.delete(`/hogiadinh/${id}`);
+  },
+  async importExcel(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await apiClient.post("/hogiadinh/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    return data;
+  },
+  async exportExcel() {
+    const { data } = await apiClient.get("/hogiadinh/export", { responseType: "blob" });
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "households.xlsx");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   }
 };
 
@@ -68,6 +89,27 @@ export const citizensApi = {
   async create(payload: Record<string, unknown>) {
     const { data } = await apiClient.post("/nhankhau", payload);
     return data;
+  },
+  async delete(id: number) {
+    await apiClient.delete(`/nhankhau/${id}`);
+  },
+  async importExcel(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await apiClient.post("/nhankhau/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    return data;
+  },
+  async exportExcel() {
+    const { data } = await apiClient.get("/nhankhau/export", { responseType: "blob" });
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "citizens.xlsx");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   }
 };
 
@@ -80,6 +122,9 @@ export const feesApi = {
     const { data } = await apiClient.post("/thuphi", payload);
     return data;
   },
+  async delete(id: number) {
+    await apiClient.delete(`/thuphi/${id}`);
+  },
   async stats() {
     const { data } = await apiClient.get("/thuphi/stats/summary");
     return data;
@@ -91,6 +136,34 @@ export const feesApi = {
   async listPayments(feeId: number) {
     const { data } = await apiClient.get(`/thuphi/${feeId}/payments`);
     return data;
+  },
+  async importExcel(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await apiClient.post("/thuphi/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    return data;
+  },
+  async exportExcel() {
+    const { data } = await apiClient.get("/thuphi/export", { responseType: "blob" });
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "fees.xlsx");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
+  async exportPayments(feeId: number) {
+    const { data } = await apiClient.get(`/thuphi/${feeId}/payments/export`, { responseType: "blob" });
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `payments_${feeId}.xlsx`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   }
 };
 
@@ -98,5 +171,8 @@ export const usersApi = {
   async list() {
     const { data } = await apiClient.get("/users");
     return data;
+  },
+  async delete(id: number) {
+    await apiClient.delete(`/users/${id}`);
   }
 };
