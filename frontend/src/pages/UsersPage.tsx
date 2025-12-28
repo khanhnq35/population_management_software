@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 
 import DataTable, { type Column } from "../components/DataTable";
+import DialogConfirm from "../components/DialogConfirm";
 import FormModal from "../components/FormModal";
 import { Button } from "../components/ui/button";
+import { useAuth } from "../contexts/AuthContext";
 import { apiClient, usersApi } from "../services/api";
 
 type User = {
@@ -23,6 +25,7 @@ const columns: Column<User>[] = [
 const UsersPage = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
+  const { user: currentUser } = useAuth();
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -39,6 +42,37 @@ const UsersPage = () => {
   useEffect(() => {
     void fetchUsers();
   }, []);
+
+  const handleDelete = async (id: number) => {
+    if (currentUser?.id === id) {
+      alert("Bạn không thể xóa chính mình.");
+      return;
+    }
+    try {
+      await usersApi.delete(id);
+      await fetchUsers();
+    } catch (error) {
+      console.error("Failed to delete user", error);
+      alert("Không thể xóa người dùng. Vui lòng thử lại.");
+    }
+  };
+
+  const columnsWithActions: Column<User>[] = [
+    ...columns,
+    {
+      key: "id" as keyof User,
+      header: "Thao tác",
+      render: (row) => (
+        <DialogConfirm
+          title="Xác nhận xóa"
+          description={`Bạn có chắc chắn muốn xóa người dùng "${row.username}"?`}
+          trigger={<Button variant="outline" size="sm" disabled={currentUser?.id === row.id}>Xóa</Button>}
+          onConfirm={() => handleDelete(row.id)}
+          confirmLabel="Xóa"
+        />
+      )
+    }
+  ];
 
   return (
     <div className="space-y-6">
@@ -99,7 +133,7 @@ const UsersPage = () => {
         </FormModal>
       </div>
 
-      <DataTable columns={columns} data={users} emptyMessage={loading ? "Đang tải..." : undefined} />
+      <DataTable columns={columnsWithActions} data={users} emptyMessage={loading ? "Đang tải..." : undefined} />
       <Button variant="ghost" onClick={() => void fetchUsers()} disabled={loading}>
         {loading ? "Đang tải..." : "Tải lại"}
       </Button>
