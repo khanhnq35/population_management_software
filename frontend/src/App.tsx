@@ -1,3 +1,4 @@
+import React from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import AppLayout from "./layouts/AppLayout";

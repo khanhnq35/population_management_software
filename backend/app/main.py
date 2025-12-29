@@ -11,6 +11,8 @@ from .routers import auth, hogiadinh, nhankhau, thuphi, user
 def create_app() -> FastAPI:
     application = FastAPI(title=settings.app_name)
 
+    print(f"🔥 CORS Origins: {settings.cors_origins}")
+
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
