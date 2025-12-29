@@ -1,8 +1,9 @@
-import { useRef, useEffect, useState, React } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import DataTable, { type Column } from "../components/DataTable";
 import DialogConfirm from "../components/DialogConfirm";
 import FormModal from "../components/FormModal";
+import SearchableSelect from "../components/SearchableSelect";
 import { Button } from "../components/ui/button";
 import { citizensApi, householdsApi } from "../services/api";
 
@@ -60,6 +61,7 @@ const CitizenPage = () => {
   const [citizens, setCitizens] = useState<Citizen[]>([]);
   const [households, setHouseholds] = useState<Household[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchData = async () => {
@@ -119,6 +121,16 @@ const CitizenPage = () => {
     }
   };
 
+  const householdOptions = useMemo(
+    () =>
+      households.map((household) => ({
+        value: String(household.id),
+        label: `${household.household_code} - ${household.head_of_household}`,
+        description: household.address
+      })),
+    [households]
+  );
+
   const columnsWithActions: Column<Citizen>[] = [
     ...columns,
     {
@@ -160,8 +172,17 @@ const CitizenPage = () => {
           <FormModal
           title="Thêm nhân khẩu"
           triggerLabel="Thêm mới"
+          onOpenChange={(isOpen) => {
+            if (!isOpen) {
+              setSelectedHouseholdId("");
+            }
+          }}
           onSubmit={async (formData, close) => {
             const payload = Object.fromEntries(formData.entries()) as Record<string, unknown>;
+            if (!payload.household_id) {
+              alert("Vui lòng chọn hộ gia đình.");
+              throw new Error("household_id missing");
+            }
             payload.household_id = Number(payload.household_id);
             if (!payload.occupation) delete payload.occupation;
             if (!payload.temporary_address) delete payload.temporary_address;
@@ -192,18 +213,17 @@ const CitizenPage = () => {
             </label>
             <label className="text-sm text-slate-300">
               Hộ gia đình *
-              <select
-                name="household_id"
-                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                required
-              >
-                <option value="">-- Chọn hộ gia đình --</option>
-                {households.map((household) => (
-                  <option key={household.id} value={household.id}>
-                    {household.household_code} - {household.head_of_household}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <SearchableSelect
+                  value={selectedHouseholdId}
+                  onChange={(value) => setSelectedHouseholdId(value)}
+                  options={householdOptions}
+                  placeholder="-- Chọn hộ gia đình --"
+                  searchPlaceholder="Tìm mã hộ hoặc chủ hộ..."
+                  emptyMessage="Không tìm thấy hộ phù hợp"
+                />
+                <input type="hidden" name="household_id" value={selectedHouseholdId} />
+              </div>
             </label>
             <label className="text-sm text-slate-300">
               Quan hệ với chủ hộ *

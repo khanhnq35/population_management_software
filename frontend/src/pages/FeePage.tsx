@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef, React } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import DataTable, { type Column } from "../components/DataTable";
 import DialogConfirm from "../components/DialogConfirm";
 import FormModal from "../components/FormModal";
+import SearchableSelect from "../components/SearchableSelect";
 import { Button } from "../components/ui/button";
 import { feesApi, householdsApi } from "../services/api";
 
@@ -39,9 +40,10 @@ const FeePage = () => {
   const [fees, setFees] = useState<Fee[]>([]);
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [households, setHouseholds] = useState<Array<{ id: number; household_code: string }>>([]);
+  const [households, setHouseholds] = useState<Array<{ id: number; household_code: string; head_of_household?: string }>>([]);
   const [loadingFee, setLoadingFee] = useState(false);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [selectedHouseholdCode, setSelectedHouseholdCode] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadFees = async () => {
@@ -81,6 +83,16 @@ const FeePage = () => {
       console.error("Failed to load households", error);
     }
   };
+
+  const householdOptions = useMemo(
+    () =>
+      households.map((household) => ({
+        value: household.household_code,
+        label: household.household_code,
+        description: household.head_of_household ? `Chủ hộ: ${household.head_of_household}` : undefined
+      })),
+    [households]
+  );
 
   useEffect(() => {
     if (selectedFee) {
@@ -254,6 +266,11 @@ const FeePage = () => {
               <FormModal
                 title={`Ghi nhận thanh toán - ${selectedFee.name}`}
                 triggerLabel="Ghi nhận"
+                onOpenChange={(isOpen) => {
+                  if (!isOpen) {
+                    setSelectedHouseholdCode("");
+                  }
+                }}
                 onSubmit={async (formData, close) => {
                   try {
                     const payload = Object.fromEntries(formData.entries()) as Record<string, any>;
@@ -282,17 +299,17 @@ const FeePage = () => {
                   </label>
                   <label className="text-sm text-slate-300">
                     Mã hộ
-                    <select
-                      name="household_code"
-                      className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                    >
-                      <option value="">-- Chọn mã hộ (tùy chọn) --</option>
-                      {households.map((household) => (
-                        <option key={household.id} value={household.household_code}>
-                          {household.household_code}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="mt-1">
+                      <SearchableSelect
+                        value={selectedHouseholdCode}
+                        onChange={(value) => setSelectedHouseholdCode(value)}
+                        options={householdOptions}
+                        placeholder="-- Chọn mã hộ (tùy chọn) --"
+                        searchPlaceholder="Tìm mã hộ hoặc chủ hộ..."
+                        emptyMessage="Không tìm thấy hộ"
+                      />
+                      <input type="hidden" name="household_code" value={selectedHouseholdCode} />
+                    </div>
                   </label>
                   <label className="text-sm text-slate-300">
                     Số tiền nộp
