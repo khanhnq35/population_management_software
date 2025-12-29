@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -5,8 +7,9 @@ from sqlalchemy.orm import Session
 from ..core.db import get_db
 from ..core.dependencies import require_roles
 from ..models.payment import Payment
+from ..models.nhankhau import NhanKhau
 from ..models.thuphi import ThuPhi
-from ..schemas.payment import PaymentCreate, PaymentOut
+from ..schemas.payment import PaymentCreate, PaymentOut, PaymentUpdate
 from ..schemas.thuphi import ThuPhiCreate, ThuPhiOut, ThuPhiUpdate
 from ..services.excel_service import create_excel_file, read_excel_file
 
@@ -90,15 +93,23 @@ def record_payment(
     if fee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee not found")
     
-    # Validate household_code if provided
-    if data.household_code:
-        household = db.query(HoGiaDinh).filter(HoGiaDinh.household_code == data.household_code).first()
-        if household is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Household code does not exist")
+    household = db.query(HoGiaDinh).filter(HoGiaDinh.household_code == data.household_code).first()
+    if household is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Household code does not exist")
+    
+    if data.citizen_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Citizen is required")
+    
+    citizen = db.query(NhanKhau).filter(NhanKhau.id == data.citizen_id).first()
+    if citizen is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Citizen not found")
+    if citizen.household_id != household.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Citizen does not belong to the selected household")
     
     payment = Payment(
-        citizen_name=data.citizen_name,
-        household_code=data.household_code,
+        citizen_id=citizen.id,
+        citizen_name=citizen.full_name,
+        household_code=household.household_code,
         amount_paid=data.amount_paid,
         fee_id=fee_id,
     )
@@ -112,6 +123,76 @@ def record_payment(
 def list_payments(fee_id: int, db: Session = Depends(get_db)) -> list[PaymentOut]:
     payments = db.query(Payment).filter(Payment.fee_id == fee_id).order_by(Payment.payment_date.desc()).all()
     return [PaymentOut.model_validate(payment) for payment in payments]
+
+
+@router.put("/{fee_id}/payments/{payment_id}", response_model=PaymentOut)
+def update_payment(
+    fee_id: int,
+    payment_id: int,
+    data: PaymentUpdate,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_roles("admin", "ke_toan")),
+) -> PaymentOut:
+    from ..models.hogiadinh import HoGiaDinh
+
+    fee = db.query(ThuPhi).filter(ThuPhi.id == fee_id).first()
+    if fee is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee not found")
+
+    payment = db.query(Payment).filter(Payment.id == payment_id, Payment.fee_id == fee_id).first()
+    if payment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+
+    update_data = data.model_dump(exclude_unset=True)
+
+    household_code = update_data.get("household_code")
+    if household_code:
+        household = db.query(HoGiaDinh).filter(HoGiaDinh.household_code == household_code).first()
+        if household is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Household code does not exist")
+    else:
+        household = None
+
+    citizen_id = update_data.get("citizen_id")
+    if citizen_id is not None:
+        citizen = db.query(NhanKhau).filter(NhanKhau.id == citizen_id).first()
+        if citizen is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Citizen not found")
+        if household and citizen.household_code != household.household_code:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Citizen does not belong to the selected household")
+        payment.citizen_id = citizen.id
+        payment.citizen_name = citizen.full_name
+        payment.household_code = citizen.household_code
+
+    if "citizen_name" in update_data and citizen_id is None:
+        payment.citizen_name = update_data["citizen_name"] or payment.citizen_name
+
+    if household_code is not None and citizen_id is None:
+        if household_code == "":
+            payment.household_code = None
+        else:
+            payment.household_code = household_code
+
+    if "amount_paid" in update_data and update_data["amount_paid"] is not None:
+        payment.amount_paid = update_data["amount_paid"]
+
+    db.commit()
+    db.refresh(payment)
+    return PaymentOut.model_validate(payment)
+
+
+@router.delete("/{fee_id}/payments/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_payment(
+    fee_id: int,
+    payment_id: int,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_roles("admin", "ke_toan")),
+) -> None:
+    payment = db.query(Payment).filter(Payment.id == payment_id, Payment.fee_id == fee_id).first()
+    if payment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+    db.delete(payment)
+    db.commit()
 
 
 @router.get("/stats/summary")
@@ -154,17 +235,25 @@ def import_fees(
                 continue
             
             # Parse date if provided
-            due_date = None
-            due_date_str = row.get("due_date")
-            if due_date_str:
-                if isinstance(due_date_str, str):
-                    from datetime import datetime
-                    due_date = datetime.fromisoformat(due_date_str.split("T")[0]).date()
-            
+            def parse_date(value):
+                if not value:
+                    return None
+                if isinstance(value, str):
+                    return datetime.fromisoformat(value.split("T")[0]).date()
+                if isinstance(value, datetime):
+                    return value.date()
+                if isinstance(value, date):
+                    return value
+                return None
+
+            start_date = parse_date(row.get("start_date"))
+            due_date = parse_date(row.get("due_date"))
+
             fee = ThuPhi(
                 name=name,
                 description=str(row.get("description", "")).strip() if row.get("description") else None,
                 amount=amount,
+                start_date=start_date,
                 due_date=due_date,
             )
             db.add(fee)
@@ -185,12 +274,13 @@ def export_fees(
     """Export fees to Excel file."""
     fees = db.query(ThuPhi).order_by(ThuPhi.created_at.desc()).all()
     
-    headers = ["name", "description", "amount", "due_date", "created_at"]
+    headers = ["name", "description", "amount", "start_date", "due_date", "created_at"]
     data = [
         {
             "name": f.name,
             "description": f.description or "",
             "amount": f.amount,
+            "start_date": f.start_date.isoformat() if f.start_date else "",
             "due_date": f.due_date.isoformat() if f.due_date else "",
             "created_at": f.created_at.isoformat() if f.created_at else "",
         }

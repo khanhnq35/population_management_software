@@ -12,9 +12,19 @@ type DataTableProps<T> = {
   columns: Column<T>[];
   data: T[];
   emptyMessage?: string;
+  getRowId?: (row: T, index: number) => string | number;
+  onRowClick?: (row: T) => void;
+  selectedRowId?: string | number;
 };
 
-const DataTable = <T extends Record<string, unknown>>({ columns, data, emptyMessage = "Không có dữ liệu" }: DataTableProps<T>) => {
+const DataTable = <T extends Record<string, unknown>>({
+  columns,
+  data,
+  emptyMessage = "Không có dữ liệu",
+  getRowId,
+  onRowClick,
+  selectedRowId
+}: DataTableProps<T>) => {
   return (
     <div className="overflow-hidden rounded-lg border border-slate-800">
       <table className="min-w-full divide-y divide-slate-800">
@@ -39,11 +49,17 @@ const DataTable = <T extends Record<string, unknown>>({ columns, data, emptyMess
             </tr>
           ) : (
             data.map((row, index) => {
-              const rowKey = (row as { id?: string | number }).id ?? index;
+              const rowKey = getRowId ? getRowId(row, index) : (row as { id?: string | number }).id ?? index;
+              const isSelected = selectedRowId !== undefined && rowKey === selectedRowId;
               return (
                 <tr
                   key={rowKey}
-                  className={cn("transition-colors", index % 2 === 0 ? "bg-slate-950/20" : "bg-slate-950/40")}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={cn(
+                    "transition-colors",
+                    onRowClick && "cursor-pointer",
+                    isSelected ? "bg-sky-500/20" : index % 2 === 0 ? "bg-slate-950/20" : "bg-slate-950/40"
+                  )}
                 >
                   {columns.map((column) => (
                   <td key={String(column.key)} className="px-4 py-3 text-sm text-slate-200">

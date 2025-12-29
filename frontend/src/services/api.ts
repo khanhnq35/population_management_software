@@ -58,6 +58,10 @@ export const householdsApi = {
     const { data } = await apiClient.post("/hogiadinh", payload);
     return data;
   },
+  async update(id: number, payload: Record<string, unknown>) {
+    const { data } = await apiClient.put(`/hogiadinh/${id}`, payload);
+    return data;
+  },
   async delete(id: number) {
     await apiClient.delete(`/hogiadinh/${id}`);
   },
@@ -88,6 +92,10 @@ export const citizensApi = {
   },
   async create(payload: Record<string, unknown>) {
     const { data } = await apiClient.post("/nhankhau", payload);
+    return data;
+  },
+  async update(id: number, payload: Record<string, unknown>) {
+    const { data } = await apiClient.put(`/nhankhau/${id}`, payload);
     return data;
   },
   async delete(id: number) {
@@ -122,6 +130,10 @@ export const feesApi = {
     const { data } = await apiClient.post("/thuphi", payload);
     return data;
   },
+  async update(id: number, payload: Record<string, unknown>) {
+    const { data } = await apiClient.put(`/thuphi/${id}`, payload);
+    return data;
+  },
   async delete(id: number) {
     await apiClient.delete(`/thuphi/${id}`);
   },
@@ -136,6 +148,13 @@ export const feesApi = {
   async listPayments(feeId: number) {
     const { data } = await apiClient.get(`/thuphi/${feeId}/payments`);
     return data;
+  },
+  async updatePayment(feeId: number, paymentId: number, payload: Record<string, unknown>) {
+    const { data } = await apiClient.put(`/thuphi/${feeId}/payments/${paymentId}`, payload);
+    return data;
+  },
+  async deletePayment(feeId: number, paymentId: number) {
+    await apiClient.delete(`/thuphi/${feeId}/payments/${paymentId}`);
   },
   async importExcel(file: File) {
     const formData = new FormData();

@@ -10,6 +10,7 @@ class ThuPhiBase(BaseModel):
     name: str = Field(..., min_length=3, max_length=128)
     description: Optional[str] = Field(default=None, max_length=255)
     amount: float = Field(..., ge=0)
+    start_date: Optional[date] = None
     due_date: Optional[date] = None
 
 
@@ -21,6 +22,7 @@ class ThuPhiUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     amount: Optional[float] = Field(default=None, ge=0)
+    start_date: Optional[date] = None
     due_date: Optional[date] = None
 
 

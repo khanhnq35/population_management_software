@@ -1,0 +1,153 @@
+==== LOCAL TEST STARTED at Tue Dec 30 01:08:10 +07 2025 ====
+true
+[1/7] 🧹 Stopping old containers...
+time="2025-12-30T01:08:10+07:00" level=warning msg="/Users/khanhnq35/Documents/2025.1/CNPM/population_management_software/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+ Container population_management_software-frontend-1  Stopping
+ Container population_management_software-frontend-1  Stopped
+ Container population_management_software-frontend-1  Removing
+ Container population_management_software-frontend-1  Removed
+ Container population_management_software-backend-1  Stopping
+ Container population_management_software-backend-1  Stopped
+ Container population_management_software-backend-1  Removing
+ Container population_management_software-backend-1  Removed
+ Container population_management_software-db-1  Stopping
+ Container population_management_software-db-1  Stopped
+ Container population_management_software-db-1  Removing
+ Container population_management_software-db-1  Removed
+ Network population_management_software_default  Removing
+ Network population_management_software_default  Removed
+[2/7] 🏗️  Building and starting containers...
+time="2025-12-30T01:08:12+07:00" level=warning msg="/Users/khanhnq35/Documents/2025.1/CNPM/population_management_software/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.23kB done
+#1 DONE 0.0s
+
+#2 [frontend internal] load build definition from Dockerfile
+#2 transferring dockerfile: 362B done
+#2 DONE 0.0s
+
+#3 [backend internal] load build definition from Dockerfile
+#3 transferring dockerfile: 451B done
+#3 DONE 0.0s
+
+#4 [auth] library/node:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#5 [auth] library/python:pull token for registry-1.docker.io
+#5 DONE 0.0s
+
+#6 [frontend internal] load metadata for docker.io/library/node:20-alpine
+#6 DONE 2.1s
+
+#7 [backend internal] load metadata for docker.io/library/python:3.11-slim
+#7 DONE 2.1s
+
+#8 [frontend internal] load .dockerignore
+#8 transferring context: 2B done
+#8 DONE 0.0s
+
+#9 [frontend internal] load build context
+#9 transferring context: 23.28kB done
+#9 DONE 0.0s
+
+#10 [frontend 1/5] FROM docker.io/library/node:20-alpine@sha256:658d0f63e501824d6c23e06d4bb95c71e7d704537c9d9272f488ac03a370d448
+#10 resolve docker.io/library/node:20-alpine@sha256:658d0f63e501824d6c23e06d4bb95c71e7d704537c9d9272f488ac03a370d448 0.0s done
+#10 DONE 0.0s
+
+#11 [backend internal] load .dockerignore
+#11 transferring context: 2B done
+#11 DONE 0.0s
+
+#12 [frontend 2/5] WORKDIR /app
+#12 CACHED
+
+#13 [frontend 3/5] COPY package.json package-lock.json* ./
+#13 CACHED
+
+#14 [frontend 4/5] RUN npm install --legacy-peer-deps || npm install --legacy-peer-deps
+#14 CACHED
+
+#15 [backend internal] load build context
+#15 transferring context: 2.22kB done
+#15 DONE 0.0s
+
+#16 [backend 1/6] FROM docker.io/library/python:3.11-slim@sha256:158caf0e080e2cd74ef2879ed3c4e697792ee65251c8208b7afb56683c32ea6c
+#16 resolve docker.io/library/python:3.11-slim@sha256:158caf0e080e2cd74ef2879ed3c4e697792ee65251c8208b7afb56683c32ea6c 0.0s done
+#16 DONE 0.0s
+
+#17 [backend 5/6] RUN pip install --no-cache-dir -r requirements.txt
+#17 CACHED
+
+#18 [backend 4/6] COPY requirements.txt .
+#18 CACHED
+
+#19 [backend 2/6] WORKDIR /app
+#19 CACHED
+
+#20 [backend 3/6] RUN apt-get update     && apt-get install -y --no-install-recommends build-essential libpq-dev     && rm -rf /var/lib/apt/lists/*
+#20 CACHED
+
+#21 [backend 6/6] COPY app ./app
+#21 CACHED
+
+#22 [frontend 5/5] COPY . .
+#22 DONE 0.0s
+
+#23 [backend] exporting to image
+#23 exporting layers done
+#23 exporting manifest sha256:19750646da030acf79f0af854df1a13d15298cca1d312849dc5ed59cd5a77573 done
+#23 exporting config sha256:d60cb3e7d7c1f7ea706c0d27a3ea0c5867edd8c7ed8657902a0a05b37e4830de done
+#23 exporting attestation manifest sha256:f1c8881c3c88360cb020fda89e243d42f23dda2b27ff0df6ebb7c2d48fed1075 0.0s done
+#23 exporting manifest list sha256:da74f54523bcaf7e81b7fd5111a75954828fd527b942b46c9c981b0639c8884d done
+#23 naming to docker.io/library/population_management_software-backend:latest done
+#23 unpacking to docker.io/library/population_management_software-backend:latest
+#23 unpacking to docker.io/library/population_management_software-backend:latest done
+#23 DONE 0.1s
+
+#24 [frontend] exporting to image
+#24 exporting layers 0.0s done
+#24 exporting manifest sha256:91b4b01e6d4dc293ab2dbb62093cfe7620f7489b97a0906b6c4f60deec5037ed done
+#24 exporting config sha256:51920a01d79976a9e524f7d883736b6cf608ac61c06a1a5c00cc84e40d23da53 done
+#24 exporting attestation manifest sha256:7b5736d2b9a9fee5dc8754d3c5a9f6147926edaaff881dbff84f3434de48e51d 0.0s done
+#24 exporting manifest list sha256:5b367f3bfaa251ae15b40dbb58f9535fe5c47aadfd8ab49a5cfa01fd94d7cb7a done
+#24 naming to docker.io/library/population_management_software-frontend:latest done
+#24 unpacking to docker.io/library/population_management_software-frontend:latest 0.0s done
+#24 DONE 0.1s
+
+#25 [backend] resolving provenance for metadata file
+#25 DONE 0.0s
+
+#26 [frontend] resolving provenance for metadata file
+#26 DONE 0.0s
+ population_management_software-backend  Built
+ population_management_software-frontend  Built
+ Network population_management_software_default  Creating
+ Network population_management_software_default  Created
+ Container population_management_software-db-1  Creating
+ Container population_management_software-db-1  Created
+ Container population_management_software-backend-1  Creating
+ Container population_management_software-backend-1  Created
+ Container population_management_software-frontend-1  Creating
+ Container population_management_software-frontend-1  Created
+ Container population_management_software-db-1  Starting
+ Container population_management_software-db-1  Started
+ Container population_management_software-backend-1  Starting
+ Container population_management_software-backend-1  Started
+ Container population_management_software-frontend-1  Starting
+ Container population_management_software-frontend-1  Started
+[3/7] ⏳ Waiting for backend & DB to be ready...
+✅ Backend health endpoint responding at http://localhost:8000/api/health
+time="2025-12-30T01:08:30+07:00" level=warning msg="/Users/khanhnq35/Documents/2025.1/CNPM/population_management_software/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+/var/run/postgresql:5432 - accepting connections
+✅ PostgreSQL ready
+[4/7] 🔍 Checking services...
+✅ Backend docs available
+✅ Frontend responding at http://localhost:5173
+[5/7] 🧪 Testing API endpoints...
+Admin login status: 200
+Register status: 400
+✅ API /nhankhau reachable
+[6/7] 🚀 Opening frontend...
+[7/7] 📝 Recording test run in CHANGELOG...
+==== LOCAL TEST COMPLETED SUCCESSFULLY ====
+✅ All services healthy! Logs saved in logs/test_local.log
