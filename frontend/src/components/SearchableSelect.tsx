@@ -16,6 +16,7 @@ type SearchableSelectProps = {
   searchPlaceholder?: string;
   emptyMessage?: string;
   disabled?: boolean;
+  className?: string;
 };
 
 const SearchableSelect = ({
@@ -25,7 +26,8 @@ const SearchableSelect = ({
   placeholder = "-- Chọn --",
   searchPlaceholder = "Tìm kiếm...",
   emptyMessage = "Không có dữ liệu",
-  disabled = false
+  disabled = false,
+  className
 }: SearchableSelectProps) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -45,27 +47,28 @@ const SearchableSelect = ({
   useEffect(() => {
     if (!open) {
       setQuery("");
+      return;
     }
-  }, [open]);
-
-  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (!containerRef.current) return;
-      if (!containerRef.current.contains(event.target as Node)) {
+      if (!containerRef.current?.contains(event.target as Node)) {
         setOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const toggle = () => {
+    if (!disabled) {
+      setOpen((prev) => !prev);
+    }
+  };
 
   return (
-    <div className="relative w-full" ref={containerRef}>
+    <div ref={containerRef} className={cn("relative", className)}>
       <button
         type="button"
-        onClick={() => !disabled && setOpen((prev) => !prev)}
+        onClick={toggle}
         disabled={disabled}
         className={cn(
           "flex w-full items-center justify-between rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-left text-sm text-white transition focus:border-sky-500 focus:outline-none disabled:opacity-60",
@@ -77,14 +80,12 @@ const SearchableSelect = ({
         </span>
         <svg
           className={cn("ml-2 h-4 w-4 text-slate-400 transition-transform", open && "rotate-180")}
-          viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          strokeWidth="1.5"
+          viewBox="0 0 24 24"
         >
-          <polyline points="6 9 12 15 18 9" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
         </svg>
       </button>
       {open && (
@@ -97,14 +98,14 @@ const SearchableSelect = ({
             placeholder={searchPlaceholder}
             className="w-full border-b border-slate-800 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none"
           />
-          <div className="max-h-56 overflow-y-auto">
+          <div className="max-h-60 overflow-y-auto">
             {filteredOptions.length === 0 ? (
-              <p className="px-3 py-4 text-center text-sm text-slate-400">{emptyMessage}</p>
+              <p className="px-3 py-3 text-center text-sm text-slate-400">{emptyMessage}</p>
             ) : (
               filteredOptions.map((option) => (
                 <button
-                  type="button"
                   key={option.value}
+                  type="button"
                   onClick={() => {
                     onChange(option.value);
                     setOpen(false);

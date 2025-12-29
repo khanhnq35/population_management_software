@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
+from datetime import date, datetime
 from ..core.db import get_db
 from ..core.dependencies import require_roles
 from ..models.hogiadinh import HoGiaDinh
@@ -101,22 +102,30 @@ def import_households(
             if not household_code:
                 errors += 1
                 continue
-            
+            raw_date = row.get("established_date")
+            established_date = None
+
+            if raw_date:
+                if isinstance(raw_date, date):
+                    established_date = raw_date
+                elif isinstance(raw_date, str):
+                    established_date = datetime.fromisoformat(raw_date.split("T")[0]).date()
             # Check if already exists
             existing = db.query(HoGiaDinh).filter(HoGiaDinh.household_code == household_code).first()
             if existing:
                 errors += 1
                 continue
             
-            household = HoGiaDinh(
+            household = HoGiaDinh(  
                 household_code=household_code,
                 address=str(row.get("address", "")).strip(),
                 head_of_household=str(row.get("head_of_household", "")).strip(),
-                established_date=row.get("established_date") if row.get("established_date") else None,
+                established_date=established_date,
             )
             db.add(household)
             imported += 1
-        except Exception:
+        except Exception as e:
+            print(f"Error: ", e)
             errors += 1
             continue
     
@@ -124,7 +133,7 @@ def import_households(
     return {"imported": imported, "errors": errors}
 
 
-@router.get("/export")
+@router.get("/export/excel")
 def export_households(
     db: Session = Depends(get_db),
     _: object = Depends(require_roles("admin", "to_truong")),

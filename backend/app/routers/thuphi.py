@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from datetime import date, datetime
 from ..core.db import get_db
 from ..core.dependencies import require_roles
 from ..models.payment import Payment
@@ -239,15 +240,24 @@ def import_fees(
                 if not value:
                     return None
                 if isinstance(value, str):
-                    return datetime.fromisoformat(value.split("T")[0]).date()
+                    try:
+                        return datetime.fromisoformat(value.split("T")[0]).date()
+                    except ValueError:
+                        return None
                 if isinstance(value, datetime):
                     return value.date()
                 if isinstance(value, date):
                     return value
                 return None
 
-            start_date = parse_date(row.get("start_date"))
-            due_date = parse_date(row.get("due_date"))
+            start_date_raw = row.get("start_date")
+            due_date_raw = row.get("due_date")
+            start_date = parse_date(start_date_raw)
+            due_date = parse_date(due_date_raw)
+
+            if (start_date_raw and start_date is None) or (due_date_raw and due_date is None):
+                errors += 1
+                continue
 
             fee = ThuPhi(
                 name=name,
@@ -266,7 +276,7 @@ def import_fees(
     return {"imported": imported, "errors": errors}
 
 
-@router.get("/export")
+@router.get("/export/excel")
 def export_fees(
     db: Session = Depends(get_db),
     _: object = Depends(require_roles("admin", "ke_toan")),

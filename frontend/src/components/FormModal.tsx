@@ -65,7 +65,7 @@ const FormModal = ({
           {description && <Dialog.Description className="mt-1 text-sm text-slate-400">{description}</Dialog.Description>}
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
             {renderedChildren}
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 pt-2">
               <Dialog.Close asChild>
                 <Button type="button" variant="ghost">
                   Hủy

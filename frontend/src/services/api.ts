@@ -51,11 +51,11 @@ export const authApi = {
 
 export const householdsApi = {
   async list(keyword?: string) {
-    const { data } = await apiClient.get("/hogiadinh", { params: { keyword } });
+    const { data } = await apiClient.get("/hogiadinh/", { params: { keyword } });
     return data;
   },
   async create(payload: Record<string, unknown>) {
-    const { data } = await apiClient.post("/hogiadinh", payload);
+    const { data } = await apiClient.post("/hogiadinh/", payload);
     return data;
   },
   async update(id: number, payload: Record<string, unknown>) {
@@ -68,13 +68,13 @@ export const householdsApi = {
   async importExcel(file: File) {
     const formData = new FormData();
     formData.append("file", file);
-    const { data } = await apiClient.post("/hogiadinh/import", formData, {
+    const { data } = await apiClient.post("/hogiadinh/import/", formData, {
       headers: { "Content-Type": "multipart/form-data" }
     });
     return data;
   },
   async exportExcel() {
-    const { data } = await apiClient.get("/hogiadinh/export", { responseType: "blob" });
+    const { data } = await apiClient.get("/hogiadinh/export/excel", { responseType: "blob" });
     const url = window.URL.createObjectURL(new Blob([data]));
     const link = document.createElement("a");
     link.href = url;
@@ -87,11 +87,11 @@ export const householdsApi = {
 
 export const citizensApi = {
   async list(params?: Record<string, unknown>) {
-    const { data } = await apiClient.get("/nhankhau", { params });
+    const { data } = await apiClient.get("/nhankhau/", { params });
     return data;
   },
   async create(payload: Record<string, unknown>) {
-    const { data } = await apiClient.post("/nhankhau", payload);
+    const { data } = await apiClient.post("/nhankhau/", payload);
     return data;
   },
   async update(id: number, payload: Record<string, unknown>) {
@@ -104,13 +104,13 @@ export const citizensApi = {
   async importExcel(file: File) {
     const formData = new FormData();
     formData.append("file", file);
-    const { data } = await apiClient.post("/nhankhau/import", formData, {
+    const { data } = await apiClient.post("/nhankhau/import/", formData, {
       headers: { "Content-Type": "multipart/form-data" }
     });
     return data;
   },
   async exportExcel() {
-    const { data } = await apiClient.get("/nhankhau/export", { responseType: "blob" });
+    const { data } = await apiClient.get("/nhankhau/export/excel", { responseType: "blob" });
     const url = window.URL.createObjectURL(new Blob([data]));
     const link = document.createElement("a");
     link.href = url;
@@ -123,11 +123,11 @@ export const citizensApi = {
 
 export const feesApi = {
   async list(keyword?: string) {
-    const { data } = await apiClient.get("/thuphi", { params: { keyword } });
+    const { data } = await apiClient.get("/thuphi/", { params: { keyword } });
     return data;
   },
   async create(payload: Record<string, unknown>) {
-    const { data } = await apiClient.post("/thuphi", payload);
+    const { data } = await apiClient.post("/thuphi/", payload);
     return data;
   },
   async update(id: number, payload: Record<string, unknown>) {
@@ -138,15 +138,15 @@ export const feesApi = {
     await apiClient.delete(`/thuphi/${id}`);
   },
   async stats() {
-    const { data } = await apiClient.get("/thuphi/stats/summary");
+    const { data } = await apiClient.get("/thuphi/stats/summary/");
     return data;
   },
   async createPayment(feeId: number, payload: Record<string, unknown>) {
-    const { data } = await apiClient.post(`/thuphi/${feeId}/payments`, payload);
+    const { data } = await apiClient.post(`/thuphi/${feeId}/payments/`, payload);
     return data;
   },
   async listPayments(feeId: number) {
-    const { data } = await apiClient.get(`/thuphi/${feeId}/payments`);
+    const { data } = await apiClient.get(`/thuphi/${feeId}/payments/`);
     return data;
   },
   async updatePayment(feeId: number, paymentId: number, payload: Record<string, unknown>) {
@@ -159,13 +159,13 @@ export const feesApi = {
   async importExcel(file: File) {
     const formData = new FormData();
     formData.append("file", file);
-    const { data } = await apiClient.post("/thuphi/import", formData, {
+    const { data } = await apiClient.post("/thuphi/import/", formData, {
       headers: { "Content-Type": "multipart/form-data" }
     });
     return data;
   },
   async exportExcel() {
-    const { data } = await apiClient.get("/thuphi/export", { responseType: "blob" });
+    const { data } = await apiClient.get("/thuphi/export/excel", { responseType: "blob" });
     const url = window.URL.createObjectURL(new Blob([data]));
     const link = document.createElement("a");
     link.href = url;
@@ -175,7 +175,7 @@ export const feesApi = {
     link.remove();
   },
   async exportPayments(feeId: number) {
-    const { data } = await apiClient.get(`/thuphi/${feeId}/payments/export`, { responseType: "blob" });
+    const { data } = await apiClient.get(`/thuphi/${feeId}/payments/export/`, { responseType: "blob" });
     const url = window.URL.createObjectURL(new Blob([data]));
     const link = document.createElement("a");
     link.href = url;

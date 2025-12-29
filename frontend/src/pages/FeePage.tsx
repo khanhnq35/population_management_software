@@ -173,6 +173,7 @@ const FeePage = () => {
       })),
     [households]
   );
+
   const paymentCitizenOptions = useMemo(
     () =>
       paymentCitizens.map((citizen) => ({
@@ -181,7 +182,9 @@ const FeePage = () => {
       })),
     [paymentCitizens]
   );
+
   const selectedCitizen = paymentCitizens.find((citizen) => citizen.id === paymentCitizenId) ?? null;
+
   const filteredPayments = useMemo(() => {
     const query = debouncedPaymentSearch.trim().toLowerCase();
     if (!query) {
@@ -196,11 +199,13 @@ const FeePage = () => {
       return tokens.some((token) => token.includes(query));
     });
   }, [payments, debouncedPaymentSearch]);
+
   const feeEmptyMessage = loadingFee
     ? "Đang tải..."
     : debouncedFeeSearch
       ? "Không có khoản thu phù hợp"
       : "Chưa có khoản thu";
+
   const paymentEmptyMessage = loadingPayments
     ? "Đang tải..."
     : debouncedPaymentSearch
@@ -234,7 +239,7 @@ const FeePage = () => {
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    
+
     try {
       const result = await feesApi.importExcel(file);
       alert(`Import thành công: ${result.imported} khoản thu, ${result.errors} lỗi`);
@@ -503,21 +508,21 @@ const FeePage = () => {
                   }}
                   onSubmit={async (formData, close) => {
                     try {
-                    const payload = Object.fromEntries(formData.entries()) as Record<string, any>;
-                    payload.amount_paid = Number(payload.amount_paid ?? 0);
-                    if (!payload.household_code) {
-                      throw new Error("Vui lòng chọn hộ gia đình.");
-                    }
-                    payload.citizen_id = payload.citizen_id ? Number(payload.citizen_id) : null;
-                    if (!payload.citizen_id) {
-                      throw new Error("Vui lòng chọn người nộp.");
-                    }
+                      const payload = Object.fromEntries(formData.entries()) as Record<string, any>;
+                      payload.amount_paid = Number(payload.amount_paid ?? 0);
+                      if (!payload.household_code) {
+                        throw new Error("Vui lòng chọn hộ gia đình.");
+                      }
+                      payload.citizen_id = payload.citizen_id ? Number(payload.citizen_id) : null;
+                      if (!payload.citizen_id) {
+                        throw new Error("Vui lòng chọn người nộp.");
+                      }
                       await feesApi.createPayment(selectedFee.id, payload);
                       await loadPayments(selectedFee.id);
                       resetPaymentForm();
                       clearError();
                       close();
-                    } catch (error: any) {
+                    } catch (error) {
                       showError(error, "Không thể tạo thanh toán. Vui lòng kiểm tra lại thông tin.");
                       throw error;
                     }
@@ -588,11 +593,7 @@ const FeePage = () => {
                     Export thanh toán
                   </Button>
                 </div>
-                <DataTable
-                  columns={paymentColumns}
-                  data={filteredPayments}
-                  emptyMessage={paymentEmptyMessage}
-                />
+                <DataTable columns={paymentColumns} data={filteredPayments} emptyMessage={paymentEmptyMessage} />
               </>
             ) : (
               <p className="text-sm text-slate-400">Chọn một khoản thu để xem thanh toán</p>
