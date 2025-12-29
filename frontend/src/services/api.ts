@@ -70,7 +70,7 @@ export const householdsApi = {
     return data;
   },
   async exportExcel() {
-    const { data } = await apiClient.get("/hogiadinh/export/", { responseType: "blob" });
+    const { data } = await apiClient.get("/hogiadinh/export/excel", { responseType: "blob" });
     const url = window.URL.createObjectURL(new Blob([data]));
     const link = document.createElement("a");
     link.href = url;
@@ -102,7 +102,7 @@ export const citizensApi = {
     return data;
   },
   async exportExcel() {
-    const { data } = await apiClient.get("/nhankhau/export/", { responseType: "blob" });
+    const { data } = await apiClient.get("/nhankhau/export/excel", { responseType: "blob" });
     const url = window.URL.createObjectURL(new Blob([data]));
     const link = document.createElement("a");
     link.href = url;
@@ -146,7 +146,7 @@ export const feesApi = {
     return data;
   },
   async exportExcel() {
-    const { data } = await apiClient.get("/thuphi/export/", { responseType: "blob" });
+    const { data } = await apiClient.get("/thuphi/export/excel", { responseType: "blob" });
     const url = window.URL.createObjectURL(new Blob([data]));
     const link = document.createElement("a");
     link.href = url;

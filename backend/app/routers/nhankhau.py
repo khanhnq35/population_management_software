@@ -2,6 +2,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
+from datetime import date, datetime
 
 from ..core.db import get_db
 from ..core.dependencies import require_roles
@@ -163,9 +164,19 @@ def import_citizens(
                 continue
             
             # Parse date
-            date_of_birth_str = row.get("date_of_birth")
-            if isinstance(date_of_birth_str, str):
-                date_of_birth = date.fromisoformat(date_of_birth_str.split("T")[0])
+            raw_dob = row.get("date_of_birth")
+            date_of_birth = None
+
+            if raw_dob:
+                if isinstance(raw_dob, date):
+                    date_of_birth = raw_dob
+                elif isinstance(raw_dob, datetime):
+                    date_of_birth = raw_dob.date()
+                elif isinstance(raw_dob, str):
+                    date_of_birth = date.fromisoformat(raw_dob.split("T")[0])
+                else:
+                    errors += 1
+                    continue
             else:
                 errors += 1
                 continue
@@ -189,6 +200,7 @@ def import_citizens(
             db.add(citizen)
             imported += 1
         except Exception as e:
+            print(f"Error: ", e)
             errors += 1
             continue
     
@@ -196,7 +208,7 @@ def import_citizens(
     return {"imported": imported, "errors": errors}
 
 
-@router.get("/export")
+@router.get("/export/excel")
 def export_citizens(
     db: Session = Depends(get_db),
     _: object = Depends(require_roles("admin", "to_truong")),
