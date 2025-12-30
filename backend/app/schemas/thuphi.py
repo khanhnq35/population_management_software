@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from .payment import PaymentOut
 
@@ -33,3 +33,15 @@ class ThuPhiOut(ThuPhiBase):
 
     class Config:
         from_attributes = True
+    
+    @computed_field
+    @property
+    def collected(self) -> float:
+        """Calculate total collected amount from payments"""
+        return sum(payment.amount_paid for payment in self.payments)
+    
+    @computed_field
+    @property
+    def remaining(self) -> float:
+        """Calculate remaining amount to be paid"""
+        return max(0, self.amount - self.collected)

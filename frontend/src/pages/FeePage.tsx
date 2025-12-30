@@ -15,6 +15,8 @@ type Fee = {
   amount: number;
   start_date?: string;
   due_date?: string;
+  collected: number;
+  remaining: number;
 };
 
 type Payment = {
@@ -56,6 +58,8 @@ const extractErrorMessage = (error: unknown, fallback: string) => {
 const feeColumns: Column<Fee>[] = [
   { key: "name", header: "Khoản thu" },
   { key: "amount", header: "Số tiền", render: (row) => formatCurrency(row.amount) },
+  { key: "collected", header: "Đã thu", render: (row) => formatCurrency(row.collected) },
+  { key: "remaining", header: "Còn phải đóng", render: (row) => formatCurrency(row.remaining) },
   { key: "start_date", header: "Ngày bắt đầu", render: (row) => formatDate(row.start_date) },
   { key: "due_date", header: "Hạn nộp", render: (row) => formatDate(row.due_date) }
 ];
