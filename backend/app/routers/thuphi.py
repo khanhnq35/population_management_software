@@ -3,10 +3,9 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-
-from datetime import date, datetime
 from ..core.db import get_db
 from ..core.dependencies import require_roles
+from ..models.hogiadinh import HoGiaDinh
 from ..models.payment import Payment
 from ..models.nhankhau import NhanKhau
 from ..models.thuphi import ThuPhi
@@ -88,8 +87,6 @@ def record_payment(
     db: Session = Depends(get_db),
     _: object = Depends(require_roles("admin", "ke_toan")),
 ) -> PaymentOut:
-    from ..models.hogiadinh import HoGiaDinh
-    
     fee = db.query(ThuPhi).filter(ThuPhi.id == fee_id).first()
     if fee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee not found")
@@ -134,8 +131,6 @@ def update_payment(
     db: Session = Depends(get_db),
     _: object = Depends(require_roles("admin", "ke_toan")),
 ) -> PaymentOut:
-    from ..models.hogiadinh import HoGiaDinh
-
     fee = db.query(ThuPhi).filter(ThuPhi.id == fee_id).first()
     if fee is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee not found")
@@ -337,3 +332,84 @@ def export_payments(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename=payments_{fee_id}.xlsx"},
     )
+
+
+@router.post("/{fee_id}/payments/import", status_code=status.HTTP_200_OK)
+def import_payments(
+    fee_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: object = Depends(require_roles("admin", "ke_toan")),
+) -> dict[str, int]:
+    """Import payments for a specific fee from Excel file."""
+    fee = db.query(ThuPhi).filter(ThuPhi.id == fee_id).first()
+    if fee is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fee not found")
+
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File must be Excel format (.xlsx or .xls)")
+
+    def parse_payment_date(value: object) -> datetime | None:
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, date):
+            return datetime.combine(value, datetime.min.time())
+        if isinstance(value, str):
+            try:
+                return datetime.fromisoformat(value.split("Z")[0])
+            except ValueError:
+                return None
+        return None
+
+    content = file.file.read()
+    rows = read_excel_file(content)
+    imported = 0
+    errors = 0
+
+    for row in rows:
+        try:
+            household_code = str(row.get("household_code", "")).strip()
+            citizen_id_raw = row.get("citizen_id")
+            amount_paid_raw = row.get("amount_paid")
+            if not household_code or citizen_id_raw in (None, "") or amount_paid_raw in (None, ""):
+                errors += 1
+                continue
+
+            household = db.query(HoGiaDinh).filter(HoGiaDinh.household_code == household_code).first()
+            if household is None:
+                errors += 1
+                continue
+
+            citizen_id = int(float(citizen_id_raw))
+            citizen = db.query(NhanKhau).filter(NhanKhau.id == citizen_id).first()
+            if citizen is None or citizen.household_id != household.id:
+                errors += 1
+                continue
+
+            amount_paid = float(amount_paid_raw)
+            if amount_paid <= 0:
+                errors += 1
+                continue
+
+            payment_date = parse_payment_date(row.get("payment_date"))
+
+            payment = Payment(
+                citizen_id=citizen.id,
+                citizen_name=citizen.full_name,
+                household_code=household.household_code,
+                amount_paid=amount_paid,
+                fee_id=fee_id,
+            )
+            if payment_date:
+                payment.payment_date = payment_date
+
+            db.add(payment)
+            imported += 1
+        except Exception:
+            errors += 1
+            continue
+
+    db.commit()
+    return {"imported": imported, "errors": errors}

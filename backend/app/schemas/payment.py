@@ -30,3 +30,7 @@ class PaymentOut(PaymentBase):
 
     class Config:
         from_attributes = True
+
+
+class PaymentHistoryOut(PaymentOut):
+    fee_name: str

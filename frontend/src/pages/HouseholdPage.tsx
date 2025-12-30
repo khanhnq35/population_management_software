@@ -1,9 +1,10 @@
 import { useRef, useEffect, useState, React } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 import DataTable, { type Column } from "../components/DataTable";
 import FormModal from "../components/FormModal";
 import { Button } from "../components/ui/button";
-import { householdsApi } from "../services/api";
+import { citizensApi, householdsApi } from "../services/api";
 import useDebounce from "../lib/useDebounce";
 
 type Household = {
@@ -15,18 +16,24 @@ type Household = {
   created_at: string;
 };
 
+const formatDateTime = (value?: string) => (value ? new Date(value).toLocaleString("vi-VN", { hour12: false }) : "-");
+
 const columns: Column<Household>[] = [
   { key: "household_code", header: "Mã hộ" },
   { key: "head_of_household", header: "Chủ hộ" },
   { key: "address", header: "Địa chỉ" },
-  { key: "established_date", header: "Ngày lập" },
-  { key: "created_at", header: "Ngày tạo" }
+  { key: "established_date", header: "Ngày lập", render: (row) => (row.established_date ? formatDateTime(row.established_date) : "-") },
+  { key: "created_at", header: "Ngày tạo", render: (row) => formatDateTime(row.created_at) }
 ];
 
 const HouseholdPage = () => {
   const [households, setHouseholds] = useState<Household[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedHousehold, setSelectedHousehold] = useState<Household | null>(null);
+  const [members, setMembers] = useState<Array<{ id: number; citizen_code: string; full_name: string; relationship_to_head: string }>>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
   const debouncedSearch = useDebounce(searchTerm, 400);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -93,17 +100,53 @@ const HouseholdPage = () => {
     }
   };
 
+  useEffect(() => {
+    if (detailOpen && selectedHousehold) {
+      void loadMembers(selectedHousehold.household_code);
+    }
+  }, [detailOpen, selectedHousehold]);
+
+  const loadMembers = async (householdCode: string) => {
+    setLoadingMembers(true);
+    try {
+      const data = await citizensApi.list({ household_code: householdCode });
+      setMembers(
+        data.map((citizen: any) => ({
+          id: citizen.id,
+          citizen_code: citizen.citizen_code,
+          full_name: citizen.full_name,
+          relationship_to_head: citizen.relationship_to_head
+        }))
+      );
+    } catch (error) {
+      console.error("Failed to load household members", error);
+      setMembers([]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const openDetail = (household: Household) => {
+    setSelectedHousehold(household);
+    setDetailOpen(true);
+  };
+
   const columnsWithActions: Column<Household>[] = [
     ...columns,
     {
       key: "id" as keyof Household,
       header: "Thao tác",
       render: (row) => (
-        <HouseholdEditModal
-          household={row}
-          onUpdate={handleUpdate}
-          onDelete={() => handleDelete(row.id)}
-        />
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => openDetail(row)}>
+            Xem chi tiết
+          </Button>
+          <HouseholdEditModal
+            household={row}
+            onUpdate={handleUpdate}
+            onDelete={() => handleDelete(row.id)}
+          />
+        </div>
       )
     }
   ];
@@ -192,6 +235,79 @@ const HouseholdPage = () => {
       <Button variant="ghost" onClick={() => void fetchData(debouncedSearch)} disabled={loading}>
         {loading ? "Đang tải..." : "Tải lại"}
       </Button>
+      <Dialog.Root open={detailOpen} onOpenChange={(open) => { setDetailOpen(open); if (!open) { setSelectedHousehold(null); setMembers([]); } }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 max-h-[90vh] w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <Dialog.Title className="text-xl font-semibold text-white">
+                  {selectedHousehold ? `Chi tiết hộ ${selectedHousehold.household_code}` : "Chi tiết hộ"}
+                </Dialog.Title>
+                {selectedHousehold && (
+                  <div className="mt-3 space-y-2 text-sm text-slate-300">
+                    <p>
+                      <span className="text-slate-400">Chủ hộ:</span> {selectedHousehold.head_of_household}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Địa chỉ:</span> {selectedHousehold.address}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Ngày lập:</span>{" "}
+                      {selectedHousehold.established_date ? new Date(selectedHousehold.established_date).toLocaleDateString("vi-VN") : "-"}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Ngày tạo:</span> {formatDateTime(selectedHousehold.created_at)}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <Dialog.Close asChild>
+                <Button variant="ghost">Đóng</Button>
+              </Dialog.Close>
+            </div>
+            <div className="mt-6">
+              <h4 className="text-lg font-semibold text-white">Thành viên</h4>
+              <div className="mt-3 rounded-lg border border-slate-800">
+                <table className="w-full table-auto text-sm text-slate-200">
+                  <thead className="bg-slate-800/60 text-left text-slate-400">
+                    <tr>
+                      <th className="px-4 py-2">Mã nhân khẩu</th>
+                      <th className="px-4 py-2">Họ tên</th>
+                      <th className="px-4 py-2">Quan hệ với chủ hộ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingMembers ? (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-4 text-center text-slate-400">
+                          Đang tải danh sách...
+                        </td>
+                      </tr>
+                    ) : members.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-4 text-center text-slate-400">
+                          Chưa có thành viên
+                        </td>
+                      </tr>
+                    ) : (
+                      members.map((member) => (
+                        <tr key={member.id} className="border-t border-slate-800/60">
+                          <td className="px-4 py-2">{member.citizen_code}</td>
+                          <td className="px-4 py-2">{member.full_name}</td>
+                          <td className="px-4 py-2 capitalize">
+                            {member.relationship_to_head.replace(/_/g, " ")}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 };
