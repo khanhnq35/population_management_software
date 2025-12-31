@@ -8,7 +8,10 @@ from ..core.db import get_db
 from ..core.dependencies import require_roles
 from ..models.hogiadinh import HoGiaDinh
 from ..models.nhankhau import NhanKhau
+from ..models.payment import Payment
+from ..models.thuphi import ThuPhi
 from ..schemas.nhankhau import NhanKhauCreate, NhanKhauOut, NhanKhauUpdate
+from ..schemas.payment import PaymentHistoryOut, PaymentOut
 from ..services.excel_service import create_excel_file, read_excel_file
 
 router = APIRouter(prefix="/nhankhau", tags=["nhankhau"])
@@ -125,6 +128,28 @@ def delete_citizen(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Citizen not found")
     db.delete(citizen)
     db.commit()
+
+
+@router.get("/{citizen_id}/payments", response_model=list[PaymentHistoryOut])
+def list_citizen_payments(citizen_id: int, db: Session = Depends(get_db)) -> list[PaymentHistoryOut]:
+    citizen = db.query(NhanKhau).filter(NhanKhau.id == citizen_id).first()
+    if citizen is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Citizen not found")
+
+    records = (
+        db.query(Payment, ThuPhi.name.label("fee_name"))
+        .join(ThuPhi, Payment.fee_id == ThuPhi.id)
+        .filter(Payment.citizen_id == citizen_id)
+        .order_by(Payment.payment_date.desc())
+        .all()
+    )
+
+    result: list[PaymentHistoryOut] = []
+    for payment, fee_name in records:
+        payment_dict = PaymentOut.model_validate(payment).model_dump()
+        payment_dict["fee_name"] = fee_name
+        result.append(PaymentHistoryOut(**payment_dict))
+    return result
 
 
 @router.post("/import", status_code=status.HTTP_200_OK)

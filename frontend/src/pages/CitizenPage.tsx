@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 import DataTable, { type Column } from "../components/DataTable";
 import FormModal from "../components/FormModal";
@@ -64,12 +65,24 @@ const columns: Column<Citizen>[] = [
   { key: "occupation", header: "Nghề nghiệp" }
 ];
 
+type PaymentHistory = {
+  id: number;
+  fee_name: string;
+  amount_paid: number;
+  payment_date: string;
+  household_code?: string;
+};
+
 const CitizenPage = () => {
   const [citizens, setCitizens] = useState<Citizen[]>([]);
   const [households, setHouseholds] = useState<Household[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [newCitizenHouseholdId, setNewCitizenHouseholdId] = useState("");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedCitizen, setSelectedCitizen] = useState<Citizen | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
   const debouncedSearch = useDebounce(searchTerm, 400);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -159,18 +172,47 @@ const CitizenPage = () => {
     [households]
   );
 
+  useEffect(() => {
+    if (detailOpen && selectedCitizen) {
+      void loadPaymentHistory(selectedCitizen.id);
+    }
+  }, [detailOpen, selectedCitizen]);
+
+  const loadPaymentHistory = async (citizenId: number) => {
+    setLoadingPayments(true);
+    try {
+      const payments = await citizensApi.getPayments(citizenId);
+      setPaymentHistory(payments);
+    } catch (error) {
+      console.error("Failed to load payment history", error);
+      setPaymentHistory([]);
+    } finally {
+      setLoadingPayments(false);
+    }
+  };
+
+  const openDetail = (citizen: Citizen) => {
+    setSelectedCitizen(citizen);
+    setDetailOpen(true);
+  };
+
   const columnsWithActions: Column<Citizen>[] = [
     ...columns,
     {
       key: "id" as keyof Citizen,
       header: "Thao tác",
       render: (row) => (
-        <CitizenEditModal
-          citizen={row}
-          householdOptions={householdOptions}
-          onUpdate={handleUpdateCitizen}
-          onDelete={() => handleDeleteCitizen(row.id)}
-        />
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => openDetail(row)}>
+            Xem chi tiết
+          </Button>
+          <CitizenEditModal
+            citizen={row}
+            householdOptions={householdOptions}
+            onUpdate={handleUpdateCitizen}
+            onDelete={() => handleDeleteCitizen(row.id)}
+          />
+        </div>
       )
     }
   ];
@@ -363,6 +405,113 @@ const CitizenPage = () => {
       <Button variant="ghost" onClick={() => void fetchCitizens(debouncedSearch)} disabled={loading}>
         {loading ? "Đang tải..." : "Tải lại"}
       </Button>
+      <Dialog.Root
+        open={detailOpen}
+        onOpenChange={(open) => {
+          setDetailOpen(open);
+          if (!open) {
+            setSelectedCitizen(null);
+            setPaymentHistory([]);
+          }
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 max-h-[90vh] w-full max-w-3xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <Dialog.Title className="text-xl font-semibold text-white">
+                  {selectedCitizen ? `Chi tiết nhân khẩu - ${selectedCitizen.full_name}` : "Chi tiết nhân khẩu"}
+                </Dialog.Title>
+                {selectedCitizen && (
+                  <div className="mt-3 grid gap-2 text-sm text-slate-300 md:grid-cols-2">
+                    <p>
+                      <span className="text-slate-400">Mã nhân khẩu:</span> {selectedCitizen.citizen_code}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Mã hộ:</span> {selectedCitizen.household_code ?? "-"}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Quan hệ:</span>{" "}
+                      {relationshipLabels[selectedCitizen.relationship_to_head] || selectedCitizen.relationship_to_head}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Trạng thái:</span> {selectedCitizen.status}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Ngày sinh:</span>{" "}
+                      {new Date(selectedCitizen.date_of_birth).toLocaleDateString("vi-VN")}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Giới tính:</span> {selectedCitizen.gender}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">CMND/CCCD:</span> {selectedCitizen.national_id ?? "-"}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Quốc tịch:</span> {selectedCitizen.nationality ?? "-"}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Dân tộc:</span> {selectedCitizen.ethnicity ?? "-"}
+                    </p>
+                    <p>
+                      <span className="text-slate-400">Nghề nghiệp:</span> {selectedCitizen.occupation ?? "-"}
+                    </p>
+                    <p className="col-span-2">
+                      <span className="text-slate-400">Nguyên quán:</span> {selectedCitizen.birthplace ?? "-"}
+                    </p>
+                    <p className="col-span-2">
+                      <span className="text-slate-400">Địa chỉ tạm trú:</span> {selectedCitizen.temporary_address ?? "-"}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <Dialog.Close asChild>
+                <Button variant="ghost">Đóng</Button>
+              </Dialog.Close>
+            </div>
+            <div className="mt-6">
+              <h4 className="text-lg font-semibold text-white">Lịch sử thu phí</h4>
+              <div className="mt-3 rounded-lg border border-slate-800">
+                <table className="w-full table-auto text-sm text-slate-200">
+                  <thead className="bg-slate-800/60 text-left text-slate-400">
+                    <tr>
+                      <th className="px-4 py-2">Khoản thu</th>
+                      <th className="px-4 py-2">Mã hộ</th>
+                      <th className="px-4 py-2">Số tiền</th>
+                      <th className="px-4 py-2">Ngày nộp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingPayments ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-4 text-center text-slate-400">
+                          Đang tải lịch sử...
+                        </td>
+                      </tr>
+                    ) : paymentHistory.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-4 text-center text-slate-400">
+                          Chưa có lịch sử thu phí
+                        </td>
+                      </tr>
+                    ) : (
+                      paymentHistory.map((payment) => (
+                        <tr key={payment.id} className="border-t border-slate-800/60">
+                          <td className="px-4 py-2">{payment.fee_name}</td>
+                          <td className="px-4 py-2">{payment.household_code ?? "-"}</td>
+                          <td className="px-4 py-2">{payment.amount_paid.toLocaleString("vi-VN")} ₫</td>
+                          <td className="px-4 py-2">{new Date(payment.payment_date).toLocaleDateString("vi-VN")}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 };

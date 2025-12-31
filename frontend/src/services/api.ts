@@ -118,6 +118,10 @@ export const citizensApi = {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  },
+  async getPayments(citizenId: number) {
+    const { data } = await apiClient.get(`/nhankhau/${citizenId}/payments`);
+    return data;
   }
 };
 
@@ -183,6 +187,14 @@ export const feesApi = {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  },
+  async importPayments(feeId: number, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const { data } = await apiClient.post(`/thuphi/${feeId}/payments/import`, formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+    return data;
   }
 };
 
