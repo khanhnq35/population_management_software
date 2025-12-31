@@ -3,8 +3,16 @@
 All notable changes to this project will be documented in this file following [Keep a Changelog](https://keepachangelog.com/) guidelines.
 
 ## [Unreleased]
+- Local test pipeline succeeded (2025-12-31 21:38)
+- Local test pipeline succeeded (2025-12-31 21:44)
+- Local test pipeline succeeded (2025-12-31 21:48)
+- Local test pipeline succeeded (2025-12-31 21:56)
+- Local test pipeline succeeded (2025-12-31 22:02)
+
+## [v0.4.4] - 2025-12-31
 - Added configurable fee collection types (mandatory per citizen/household/list, voluntary, none) with import/export support, optional fee amounts for voluntary fees, and paid/unpaid obligation views in the fee detail modal.
 - Fixed population endpoints rejecting legacy records without national IDs by accepting null values.
+- Introduced an interactive “Thống kê” dashboard with advanced KPIs, filters, charts, and insights focused on fee collection and household status.
 - Local test pipeline succeeded (2025-12-29 23:16)
 - Local test pipeline succeeded (2025-12-29 23:25)
 - Local test pipeline succeeded (2025-12-29 23:38)
