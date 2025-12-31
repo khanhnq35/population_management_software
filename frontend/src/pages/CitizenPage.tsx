@@ -436,7 +436,7 @@ const CitizenPage = () => {
                       {relationshipLabels[selectedCitizen.relationship_to_head] || selectedCitizen.relationship_to_head}
                     </p>
                     <p>
-                      <span className="text-slate-400">Trạng thái:</span> {selectedCitizen.status}
+                      <span className="text-slate-400">Trạng thái:</span> {statusLabels[selectedCitizen.status]}
                     </p>
                     <p>
                       <span className="text-slate-400">Ngày sinh:</span>{" "}

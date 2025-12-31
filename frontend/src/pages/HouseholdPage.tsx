@@ -294,7 +294,7 @@ const HouseholdPage = () => {
                 )}
               </div>
               <Dialog.Close asChild>
-                <Button variant="ghost">Đóng</Button>
+                <Button variant="outline">Đóng</Button>
               </Dialog.Close>
             </div>
             <div className="mt-6">
