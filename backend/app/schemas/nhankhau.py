@@ -1,15 +1,15 @@
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class NhanKhauBase(BaseModel):
     citizen_code: str = Field(..., min_length=1, max_length=50)
     full_name: str = Field(..., min_length=3, max_length=128)
     date_of_birth: date
-    gender: str = Field(..., pattern="^(Nam|Nu|Khac|nam|nu|khac)$")
-    national_id: str = Field(..., min_length=1, max_length=20)
+    gender: str = Field(..., min_length=1, max_length=16)
+    national_id: Optional[str] = Field(default=None, max_length=20)
     household_id: int
     household_code: Optional[str] = Field(default=None, max_length=50)
     relationship_to_head: Literal["chu_ho", "bo", "me", "ong", "ba", "anh", "chi", "em", "chong", "vo", "con", "chau"] = "chu_ho"
@@ -19,6 +19,13 @@ class NhanKhauBase(BaseModel):
     ethnicity: Optional[str] = Field(default=None, max_length=100)
     occupation: Optional[str] = Field(default=None, max_length=128)
     temporary_address: Optional[str] = Field(default=None, max_length=255)
+
+    @field_validator("national_id", mode="before")
+    @classmethod
+    def allow_empty_national_id(cls, value: Optional[str]) -> Optional[str]:
+        if value in ("", None):
+            return None
+        return value
 
 
 class NhanKhauCreate(NhanKhauBase):

@@ -3,6 +3,8 @@
 All notable changes to this project will be documented in this file following [Keep a Changelog](https://keepachangelog.com/) guidelines.
 
 ## [Unreleased]
+- Added configurable fee collection types (mandatory per citizen/household/list, voluntary, none) with import/export support, optional fee amounts for voluntary fees, and paid/unpaid obligation views in the fee detail modal.
+- Fixed population endpoints rejecting legacy records without national IDs by accepting null values.
 - Local test pipeline succeeded (2025-12-29 23:16)
 - Local test pipeline succeeded (2025-12-29 23:25)
 - Local test pipeline succeeded (2025-12-29 23:38)
@@ -31,6 +33,12 @@ All notable changes to this project will be documented in this file following [K
 - Local test pipeline succeeded (2025-12-31 01:36)
 - Local test pipeline succeeded (2025-12-31 01:42)
 - Local test pipeline succeeded (2025-12-31 01:45)
+- Local test pipeline succeeded (2025-12-31 19:42)
+- Local test pipeline succeeded (2025-12-31 19:46)
+- Local test pipeline succeeded (2025-12-31 19:54)
+- Local test pipeline succeeded (2025-12-31 20:51)
+- Local test pipeline succeeded (2025-12-31 20:55)
+- Local test pipeline succeeded (2025-12-31 21:01)
 
 ## [v0.4.3] - 2025-12-26
 - Local test pipeline succeeded (2025-12-26 22:27)

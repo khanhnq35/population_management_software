@@ -125,6 +125,25 @@ export const citizensApi = {
   }
 };
 
+export type FeeCollectionType =
+  | "bat_buoc_ca_nhan"
+  | "bat_buoc_theo_ho"
+  | "bat_buoc_theo_danh_sach"
+  | "tu_nguyen"
+  | "none";
+
+export type FeeObligationEntry = {
+  code: string;
+  name: string;
+  paid_amount?: number;
+};
+
+export type FeeObligations = {
+  collection_type: FeeCollectionType;
+  paid: FeeObligationEntry[];
+  unpaid: FeeObligationEntry[];
+};
+
 export const feesApi = {
   async list(keyword?: string) {
     const { data } = await apiClient.get("/thuphi/", { params: { keyword } });
@@ -194,6 +213,10 @@ export const feesApi = {
     const { data } = await apiClient.post(`/thuphi/${feeId}/payments/import`, formData, {
       headers: { "Content-Type": "multipart/form-data" }
     });
+    return data;
+  },
+  async getObligations(feeId: number) {
+    const { data } = await apiClient.get<FeeObligations>(`/thuphi/${feeId}/obligations`);
     return data;
   }
 };

@@ -7,15 +7,25 @@ import FormModal from "../components/FormModal";
 import SearchableSelect from "../components/SearchableSelect";
 import { Button } from "../components/ui/button";
 import useDebounce from "../lib/useDebounce";
-import { citizensApi, feesApi, householdsApi } from "../services/api";
+import {
+  citizensApi,
+  feesApi,
+  householdsApi,
+  type FeeCollectionType,
+  type FeeObligations
+} from "../services/api";
+
+type CollectionType = FeeCollectionType;
 
 type Fee = {
   id: number;
   name: string;
   description?: string;
-  amount: number;
+  amount: number | null;
   start_date?: string;
   due_date?: string;
+  collection_type: CollectionType;
+  target_codes?: string[];
   collected: number;
   remaining: number;
 };
@@ -41,7 +51,22 @@ type CitizenOption = {
   household_code: string;
 };
 
-const formatCurrency = (value: number) => `${value.toLocaleString("vi-VN")} ₫`;
+const collectionTypeLabels: Record<CollectionType, string> = {
+  bat_buoc_ca_nhan: "Bắt buộc cá nhân",
+  bat_buoc_theo_ho: "Bắt buộc theo hộ",
+  bat_buoc_theo_danh_sach: "Bắt buộc theo danh sách",
+  tu_nguyen: "Tự nguyện",
+  none: "Không xác định"
+};
+
+const mandatoryCollectionTypes: CollectionType[] = [
+  "bat_buoc_ca_nhan",
+  "bat_buoc_theo_ho",
+  "bat_buoc_theo_danh_sach"
+];
+
+const formatCurrency = (value?: number | null) =>
+  typeof value === "number" ? `${value.toLocaleString("vi-VN")} ₫` : "Không cố định";
 const formatDate = (value?: string) => (value ? new Date(value).toLocaleDateString("vi-VN") : "-");
 const extractErrorMessage = (error: unknown, fallback: string) => {
   if (typeof error === "object" && error !== null) {
@@ -58,6 +83,11 @@ const extractErrorMessage = (error: unknown, fallback: string) => {
 
 const feeColumns: Column<Fee>[] = [
   { key: "name", header: "Khoản thu" },
+  {
+    key: "collection_type",
+    header: "Loại",
+    render: (row) => collectionTypeLabels[row.collection_type] ?? row.collection_type
+  },
   { key: "amount", header: "Số tiền", render: (row) => formatCurrency(row.amount) },
   { key: "collected", header: "Đã thu", render: (row) => formatCurrency(row.collected) },
   { key: "remaining", header: "Còn phải đóng", render: (row) => formatCurrency(row.remaining) },
@@ -71,6 +101,127 @@ const paymentColumns: Column<Payment>[] = [
   { key: "amount_paid", header: "Số tiền", render: (row) => `${row.amount_paid.toLocaleString("vi-VN")} ₫` },
   { key: "payment_date", header: "Ngày nộp" }
 ];
+
+type FeeFormContentsProps = {
+  defaultValues?: Partial<Fee>;
+  onDelete?: () => void;
+};
+
+const FeeFormContents = ({ defaultValues, onDelete }: FeeFormContentsProps) => {
+  const defaultCollectionType = defaultValues?.collection_type ?? "none";
+  const defaultTargetCodes = (defaultValues?.target_codes ?? []).join("\n");
+  const [collectionType, setCollectionType] = useState<CollectionType>(defaultCollectionType);
+  const [targetCodes, setTargetCodes] = useState<string>(defaultTargetCodes);
+  const isMandatory = mandatoryCollectionTypes.includes(collectionType);
+  const isListType = collectionType === "bat_buoc_theo_danh_sach";
+
+  const formatDateValue = (value?: string) => (value ? value.slice(0, 10) : "");
+
+  useEffect(() => {
+    setCollectionType(defaultCollectionType);
+  }, [defaultCollectionType]);
+
+  useEffect(() => {
+    setTargetCodes(defaultTargetCodes);
+  }, [defaultTargetCodes]);
+
+  return (
+    <div className="grid grid-cols-1 gap-4">
+      <label className="text-sm text-slate-300">
+        Tên khoản thu
+        <input
+          name="name"
+          defaultValue={defaultValues?.name ?? ""}
+          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+          required
+        />
+      </label>
+      <label className="text-sm text-slate-300">
+        Loại khoản thu
+        <select
+          name="collection_type"
+          value={collectionType}
+          onChange={(event) => setCollectionType(event.target.value as CollectionType)}
+          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+        >
+          {Object.entries(collectionTypeLabels).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-slate-400">
+          Chọn hình thức thu để hệ thống tự động xác định danh sách phải nộp.
+        </p>
+      </label>
+      <label className="text-sm text-slate-300">
+        Số tiền (VNĐ)
+        <input
+          name="amount"
+          type="number"
+          defaultValue={typeof defaultValues?.amount === "number" ? defaultValues.amount : ""}
+          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+          min={0}
+          step="1000"
+          required={isMandatory}
+        />
+        {!isMandatory && <p className="mt-1 text-xs text-slate-400">Có thể bỏ trống nếu khoản thu tự nguyện hoặc không xác định.</p>}
+      </label>
+      <label className="text-sm text-slate-300">
+        Ngày bắt đầu
+        <input
+          name="start_date"
+          type="date"
+          defaultValue={formatDateValue(defaultValues?.start_date)}
+          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+        />
+      </label>
+      <label className="text-sm text-slate-300">
+        Hạn nộp
+        <input
+          name="due_date"
+          type="date"
+          defaultValue={formatDateValue(defaultValues?.due_date)}
+          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+        />
+      </label>
+      <label className="text-sm text-slate-300">
+        Mô tả
+        <textarea
+          name="description"
+          defaultValue={defaultValues?.description ?? ""}
+          className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+        />
+      </label>
+      {isListType && (
+        <label className="text-sm text-slate-300">
+          Danh sách mã bắt buộc
+          <textarea
+            name="target_codes"
+            value={targetCodes}
+            onChange={(event) => setTargetCodes(event.target.value)}
+            className="mt-1 w-full rounded-md border border-dashed border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+            placeholder="Nhập mỗi mã nhân khẩu trên một dòng"
+            required
+          />
+          <p className="mt-1 text-xs text-slate-400">Chỉ những mã nằm trong danh sách này mới bị yêu cầu đóng.</p>
+        </label>
+      )}
+      {onDelete && (
+        <div className="pt-2 text-right">
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-red-400 hover:text-red-300"
+            onClick={onDelete}
+          >
+            Xóa khoản thu
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const FeePage = () => {
   const [fees, setFees] = useState<Fee[]>([]);
@@ -87,6 +238,7 @@ const FeePage = () => {
   const [paymentCitizens, setPaymentCitizens] = useState<CitizenOption[]>([]);
   const [paymentCitizenId, setPaymentCitizenId] = useState<number | null>(null);
   const [loadingPaymentCitizens, setLoadingPaymentCitizens] = useState(false);
+  const [obligations, setObligations] = useState<FeeObligations | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const paymentImportInputRef = useRef<HTMLInputElement>(null);
   const debouncedFeeSearch = useDebounce(feeSearchTerm, 400);
@@ -107,7 +259,11 @@ const FeePage = () => {
       clearError();
       setSelectedFee((prev) => {
         if (!prev) return null;
-        return data.find((fee) => fee.id === prev.id) ?? null;
+        const next = data.find((fee) => fee.id === prev.id) ?? null;
+        if (!next) {
+          setObligations(null);
+        }
+        return next;
       });
     } catch (error) {
       showError(error, "Không thể tải danh sách khoản thu. Vui lòng thử lại.");
@@ -126,6 +282,20 @@ const FeePage = () => {
       showError(error, "Không thể tải danh sách thanh toán.");
     } finally {
       setLoadingPayments(false);
+    }
+  };
+
+  const loadObligations = async (fee: Fee | null) => {
+    if (!fee || fee.collection_type === "tu_nguyen" || fee.collection_type === "none") {
+      setObligations(null);
+      return;
+    }
+    try {
+      const data = await feesApi.getObligations(fee.id);
+      setObligations(data);
+    } catch (error) {
+      console.error("Failed to load obligations", error);
+      setObligations(null);
     }
   };
 
@@ -225,11 +395,18 @@ const FeePage = () => {
     }
   }, [paymentModalOpen, selectedFee]);
 
+  useEffect(() => {
+    if (paymentModalOpen && selectedFee) {
+      void loadObligations(selectedFee);
+    }
+  }, [paymentModalOpen, selectedFee]);
+
   const handleDeleteFee = async (id: number) => {
     try {
       await feesApi.delete(id);
       if (selectedFee?.id === id) {
         setSelectedFee(null);
+        setObligations(null);
       }
       await loadFees();
     } catch (error) {
@@ -264,10 +441,41 @@ const FeePage = () => {
 
   const buildFeePayload = (formData: FormData) => {
     const payload = Object.fromEntries(formData.entries()) as Record<string, any>;
-    payload.amount = Number(payload.amount ?? 0);
+    const collectionType = (payload.collection_type as CollectionType | undefined) ?? "none";
+    payload.collection_type = collectionType;
+
+    const rawAmount = formData.get("amount") as string | null;
+    if (rawAmount === null || rawAmount.trim() === "") {
+      payload.amount = null;
+    } else {
+      payload.amount = Number(rawAmount);
+      if (Number.isNaN(payload.amount)) {
+        payload.amount = null;
+      }
+    }
+
     if (!payload.description) delete payload.description;
     if (!payload.due_date) delete payload.due_date;
     if (!payload.start_date) delete payload.start_date;
+
+    const rawTargetCodes = (formData.get("target_codes") as string | null) ?? "";
+    const normalizedTargets = rawTargetCodes
+      .split(/[\n,]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    if (collectionType === "bat_buoc_theo_danh_sach") {
+      if (normalizedTargets.length === 0) {
+        throw new Error("Vui lòng nhập danh sách mã nhân khẩu cho loại bắt buộc theo danh sách.");
+      }
+      payload.target_codes = normalizedTargets;
+    } else {
+      delete payload.target_codes;
+    }
+
+    if (mandatoryCollectionTypes.includes(collectionType) && payload.amount === null) {
+      throw new Error("Khoản thu bắt buộc phải có số tiền cụ thể.");
+    }
+
     return payload;
   };
 
@@ -299,66 +507,14 @@ const FeePage = () => {
             }}
           >
             {({ close }) => (
-              <div className="grid grid-cols-1 gap-4">
-                <label className="text-sm text-slate-300">
-                  Tên khoản thu
-                  <input
-                    name="name"
-                    defaultValue={row.name}
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                    required
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  Số tiền (VNĐ)
-                  <input
-                    name="amount"
-                    type="number"
-                    defaultValue={row.amount}
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                    required
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  Ngày bắt đầu
-                  <input
-                    name="start_date"
-                    type="date"
-                    defaultValue={row.start_date ? row.start_date.slice(0, 10) : ""}
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  Hạn nộp
-                  <input
-                    name="due_date"
-                    type="date"
-                    defaultValue={row.due_date ? row.due_date.slice(0, 10) : ""}
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                  />
-                </label>
-                <label className="text-sm text-slate-300">
-                  Mô tả
-                  <textarea
-                    name="description"
-                    defaultValue={row.description ?? ""}
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                  />
-                </label>
-                <div className="pt-2 text-right">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="text-red-400 hover:text-red-300"
-                    onClick={() => {
-                      if (!window.confirm(`Bạn có chắc chắn muốn xóa khoản thu "${row.name}"?`)) return;
-                      void handleDeleteFee(row.id).then(close);
-                    }}
-                  >
-                    Xóa khoản thu
-                  </Button>
-                </div>
-              </div>
+              <FeeFormContents
+                key={`fee-form-${row.id}`}
+                defaultValues={row}
+                onDelete={() => {
+                  if (!window.confirm(`Bạn có chắc chắn muốn xóa khoản thu "${row.name}"?`)) return;
+                  void handleDeleteFee(row.id).then(close);
+                }}
+              />
             )}
           </FormModal>
         </div>
@@ -377,6 +533,7 @@ const FeePage = () => {
     if (!open) {
       setSelectedFee(null);
       setPayments([]);
+      setObligations(null);
       setPaymentSearchTerm("");
       resetPaymentForm();
     }
@@ -392,6 +549,7 @@ const FeePage = () => {
       const result = await feesApi.importPayments(selectedFee.id, file);
       alert(`Import thành công: ${result.imported} thanh toán, ${result.errors} lỗi`);
       await loadPayments(selectedFee.id);
+      await loadObligations(selectedFee);
       clearError();
     } catch (error) {
       showError(error, "Không thể import thanh toán. Vui lòng kiểm tra file.");
@@ -456,48 +614,7 @@ const FeePage = () => {
               }
             }}
           >
-            <div className="grid grid-cols-1 gap-4">
-              <label className="text-sm text-slate-300">
-                Tên khoản thu
-                <input
-                  name="name"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                  required
-                />
-              </label>
-              <label className="text-sm text-slate-300">
-                Số tiền (VNĐ)
-                <input
-                  name="amount"
-                  type="number"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                  required
-                />
-              </label>
-              <label className="text-sm text-slate-300">
-                Ngày bắt đầu
-                <input
-                  name="start_date"
-                  type="date"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                />
-              </label>
-              <label className="text-sm text-slate-300">
-                Hạn nộp
-                <input
-                  name="due_date"
-                  type="date"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                />
-              </label>
-              <label className="text-sm text-slate-300">
-                Mô tả
-                <textarea
-                  name="description"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
-                />
-              </label>
-            </div>
+            <FeeFormContents />
           </FormModal>
         </div>
       </div>
@@ -525,6 +642,7 @@ const FeePage = () => {
                 </Dialog.Title>
                 {selectedFee && (
                   <div className="mt-2 text-sm text-slate-300">
+                    <p>Loại: {collectionTypeLabels[selectedFee.collection_type]}</p>
                     <p>Số tiền: {formatCurrency(selectedFee.amount)}</p>
                     <p>Đã thu: {formatCurrency(selectedFee.collected)}</p>
                     <p>Còn thiếu: {formatCurrency(selectedFee.remaining)}</p>
@@ -535,6 +653,57 @@ const FeePage = () => {
                 <Button variant="ghost">Đóng</Button>
               </Dialog.Close>
             </div>
+            {selectedFee && obligations && (
+              <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-sm font-semibold text-white">Trạng thái nghĩa vụ</h4>
+                  <span className="text-xs text-slate-400">{collectionTypeLabels[obligations.collection_type]}</span>
+                </div>
+                <div className="mt-3 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-300">Đã thanh toán</p>
+                    <div className="mt-2 space-y-2">
+                      {obligations.paid.length === 0 ? (
+                        <p className="text-xs text-slate-500">Chưa có ai hoàn thành nghĩa vụ.</p>
+                      ) : (
+                        obligations.paid.map((entry) => (
+                          <div
+                            key={`paid-${entry.code}`}
+                            className="rounded border border-emerald-500/30 bg-emerald-500/5 p-2 text-sm text-slate-200"
+                          >
+                            <div className="font-medium">{entry.name}</div>
+                            <div className="text-xs text-slate-400">Mã: {entry.code}</div>
+                            {typeof entry.paid_amount === "number" && (
+                              <div className="text-xs text-emerald-300">
+                                Đã nộp: {entry.paid_amount.toLocaleString("vi-VN")} ₫
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-amber-300">Chưa thanh toán</p>
+                    <div className="mt-2 space-y-2">
+                      {obligations.unpaid.length === 0 ? (
+                        <p className="text-xs text-slate-500">Tất cả đã hoàn thành nghĩa vụ.</p>
+                      ) : (
+                        obligations.unpaid.map((entry) => (
+                          <div
+                            key={`unpaid-${entry.code}`}
+                            className="rounded border border-amber-500/30 bg-amber-500/5 p-2 text-sm text-slate-200"
+                          >
+                            <div className="font-medium">{entry.name}</div>
+                            <div className="text-xs text-slate-400">Mã: {entry.code}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {selectedFee && (
               <>
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -586,6 +755,7 @@ const FeePage = () => {
                             setSelectedFee(updatedSelectedFee);
                           }
                           await loadPayments(selectedFee.id);
+                          await loadObligations(updatedSelectedFee ?? selectedFee);
                           resetPaymentForm();
                           clearError();
                           close();
