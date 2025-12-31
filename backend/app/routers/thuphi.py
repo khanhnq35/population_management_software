@@ -237,6 +237,8 @@ def record_payment(
         amount_paid=data.amount_paid,
         fee_id=fee_id,
     )
+    if data.payment_date:
+        payment.payment_date = data.payment_date
     db.add(payment)
     db.commit()
     db.refresh(payment)
@@ -299,6 +301,9 @@ def update_payment(
 
     if "amount_paid" in update_data and update_data["amount_paid"] is not None:
         payment.amount_paid = update_data["amount_paid"]
+    
+    if "payment_date" in update_data and update_data["payment_date"] is not None:
+        payment.payment_date = update_data["payment_date"]
 
     db.commit()
     db.refresh(payment)

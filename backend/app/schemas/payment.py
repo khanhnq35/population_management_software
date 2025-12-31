@@ -14,6 +14,7 @@ class PaymentBase(BaseModel):
 class PaymentCreate(PaymentBase):
     household_code: str = Field(..., min_length=1, max_length=50)
     citizen_id: int = Field(..., ge=1)
+    payment_date: Optional[datetime] = None
 
 
 class PaymentUpdate(BaseModel):
@@ -21,6 +22,7 @@ class PaymentUpdate(BaseModel):
     household_code: Optional[str] = Field(default=None, max_length=50)
     amount_paid: Optional[float] = Field(default=None, ge=0)
     citizen_id: Optional[int] = Field(default=None, ge=1)
+    payment_date: Optional[datetime] = None
 
 
 class PaymentOut(PaymentBase):

@@ -99,7 +99,7 @@ const paymentColumns: Column<Payment>[] = [
   { key: "citizen_name", header: "Người nộp" },
   { key: "household_code", header: "Mã hộ" },
   { key: "amount_paid", header: "Số tiền", render: (row) => `${row.amount_paid.toLocaleString("vi-VN")} ₫` },
-  { key: "payment_date", header: "Ngày nộp" }
+  { key: "payment_date", header: "Ngày nộp", render: (row) => formatDate(row.payment_date) }
 ];
 
 type FeeFormContentsProps = {
@@ -414,6 +414,43 @@ const FeePage = () => {
     }
   };
 
+  const handleDeletePayment = async (paymentId: number) => {
+    if (!selectedFee) return;
+    try {
+      await feesApi.deletePayment(selectedFee.id, paymentId);
+      const updatedFees = await feesApi.list();
+      setFees(updatedFees);
+      const updatedSelectedFee = updatedFees.find((fee) => fee.id === selectedFee.id);
+      if (updatedSelectedFee) {
+        setSelectedFee(updatedSelectedFee);
+      }
+      await loadPayments(selectedFee.id);
+      await loadObligations(updatedSelectedFee ?? selectedFee);
+      clearError();
+    } catch (error) {
+      showError(error, "Không thể xóa thanh toán. Vui lòng thử lại.");
+    }
+  };
+
+  const handleUpdatePayment = async (paymentId: number, payload: Record<string, unknown>) => {
+    if (!selectedFee) return;
+    try {
+      await feesApi.updatePayment(selectedFee.id, paymentId, payload);
+      const updatedFees = await feesApi.list();
+      setFees(updatedFees);
+      const updatedSelectedFee = updatedFees.find((fee) => fee.id === selectedFee.id);
+      if (updatedSelectedFee) {
+        setSelectedFee(updatedSelectedFee);
+      }
+      await loadPayments(selectedFee.id);
+      await loadObligations(updatedSelectedFee ?? selectedFee);
+      clearError();
+    } catch (error) {
+      showError(error, "Không thể cập nhật thanh toán. Vui lòng thử lại.");
+      throw error;
+    }
+  };
+
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -517,6 +554,24 @@ const FeePage = () => {
               />
             )}
           </FormModal>
+        </div>
+      )
+    }
+  ];
+
+  const paymentColumnsWithActions: Column<Payment>[] = [
+    ...paymentColumns,
+    {
+      key: "id" as keyof Payment,
+      header: "Thao tác",
+      render: (row) => (
+        <div className="flex gap-2">
+          <PaymentEditModal
+            payment={row}
+            feeId={selectedFee?.id ?? 0}
+            onUpdate={handleUpdatePayment}
+            onDelete={() => handleDeletePayment(row.id)}
+          />
         </div>
       )
     }
@@ -747,6 +802,9 @@ const FeePage = () => {
                           if (!payload.citizen_id) {
                             throw new Error("Vui lòng chọn người nộp.");
                           }
+                          if (payload.payment_date) {
+                            payload.payment_date = new Date(payload.payment_date).toISOString();
+                          }
                           await feesApi.createPayment(selectedFee.id, payload);
                           const updatedFees = await feesApi.list();
                           setFees(updatedFees);
@@ -807,10 +865,20 @@ const FeePage = () => {
                         </div>
                         <input type="hidden" name="citizen_name" value={selectedCitizen?.full_name ?? ""} />
                         <label className="text-sm text-slate-300">
-                          Số tiền nộp
+                          Số tiền nộp *
                           <input
                             type="number"
                             name="amount_paid"
+                            className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+                            required
+                          />
+                        </label>
+                        <label className="text-sm text-slate-300">
+                          Ngày nộp *
+                          <input
+                            type="date"
+                            name="payment_date"
+                            defaultValue={new Date().toISOString().split('T')[0]}
                             className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
                             required
                           />
@@ -820,7 +888,7 @@ const FeePage = () => {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <DataTable columns={paymentColumns} data={filteredPayments} emptyMessage={paymentEmptyMessage} />
+                  <DataTable columns={paymentColumnsWithActions} data={filteredPayments} emptyMessage={paymentEmptyMessage} />
                 </div>
               </>
             )}
@@ -828,6 +896,92 @@ const FeePage = () => {
         </Dialog.Portal>
       </Dialog.Root>
     </div>
+  );
+};
+
+type PaymentEditModalProps = {
+  payment: Payment;
+  feeId: number;
+  onUpdate: (paymentId: number, payload: Record<string, unknown>) => Promise<void>;
+  onDelete: () => Promise<void>;
+};
+
+const PaymentEditModal = ({ payment, feeId, onUpdate, onDelete }: PaymentEditModalProps) => {
+  const formatDateForInput = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toISOString().split('T')[0];
+  };
+
+  return (
+    <>
+      <FormModal
+        title={`Chỉnh sửa thanh toán - ${payment.citizen_name}`}
+        triggerLabel="Chỉnh sửa"
+        triggerButtonProps={{ variant: "outline", size: "sm" }}
+        onSubmit={async (formData, close) => {
+          const payload = Object.fromEntries(formData.entries()) as Record<string, any>;
+          payload.amount_paid = Number(payload.amount_paid ?? 0);
+          if (payload.payment_date) {
+            payload.payment_date = new Date(payload.payment_date).toISOString();
+          }
+          await onUpdate(payment.id, payload);
+          close();
+        }}
+      >
+        <div className="space-y-4">
+          <label className="text-sm text-slate-300">
+            Người nộp
+            <input
+              name="citizen_name"
+              defaultValue={payment.citizen_name}
+              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+              disabled
+            />
+          </label>
+          <label className="text-sm text-slate-300">
+            Mã hộ
+            <input
+              name="household_code"
+              defaultValue={payment.household_code ?? ""}
+              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+              disabled
+            />
+          </label>
+          <label className="text-sm text-slate-300">
+            Số tiền nộp *
+            <input
+              type="number"
+              name="amount_paid"
+              defaultValue={payment.amount_paid}
+              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+              required
+            />
+          </label>
+          <label className="text-sm text-slate-300">
+            Ngày nộp *
+            <input
+              type="date"
+              name="payment_date"
+              defaultValue={formatDateForInput(payment.payment_date)}
+              className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+              required
+            />
+          </label>
+        </div>
+      </FormModal>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-red-400 hover:text-red-300"
+        onClick={async () => {
+          if (window.confirm(`Bạn có chắc chắn muốn xóa thanh toán của "${payment.citizen_name}"?`)) {
+            await onDelete();
+          }
+        }}
+      >
+        Xóa
+      </Button>
+    </>
   );
 };
 
