@@ -144,6 +144,62 @@ export type FeeObligations = {
   unpaid: FeeObligationEntry[];
 };
 
+export type DashboardFilters = {
+  from?: string;
+  to?: string;
+  fee_id?: number | null;
+};
+
+export type DashboardOverview = {
+  filters: DashboardFilters;
+  kpis: {
+    total_households: number;
+    total_citizens: number;
+    total_fees: number;
+    expected_total: number;
+    collected_total: number;
+    outstanding_total: number;
+    completion_rate: number;
+    households_full: number;
+    households_partial: number;
+    households_none: number;
+  };
+  timeseries: {
+    expected_vs_collected: Array<{ period: string; expected: number; collected: number }>;
+    status_distribution: { full: number; partial: number; none: number };
+  };
+  fees: {
+    summary: Array<{
+      id: number;
+      name: string;
+      collection_type: FeeCollectionType;
+      expected: number;
+      collected: number;
+      outstanding: number;
+      completion: number;
+    }>;
+    low_completion: Array<{
+      id: number;
+      name: string;
+      collection_type: FeeCollectionType;
+      expected: number;
+      collected: number;
+      outstanding: number;
+      completion: number;
+    }>;
+  };
+  households: {
+    top_debtors: Array<{
+      household_code: string;
+      head_of_household: string;
+      expected: number;
+      paid: number;
+      outstanding: number;
+      pending_fees: number;
+    }>;
+  };
+};
+
 export const feesApi = {
   async list(keyword?: string) {
     const { data } = await apiClient.get("/thuphi/", { params: { keyword } });
@@ -217,6 +273,19 @@ export const feesApi = {
   },
   async getObligations(feeId: number) {
     const { data } = await apiClient.get<FeeObligations>(`/thuphi/${feeId}/obligations`);
+    return data;
+  }
+};
+
+export const dashboardApi = {
+  async overview(params: DashboardFilters) {
+    const { data } = await apiClient.get<DashboardOverview>("/dashboard/overview", {
+      params: {
+        from: params.from || undefined,
+        to: params.to || undefined,
+        fee_id: params.fee_id ?? undefined
+      }
+    });
     return data;
   }
 };
