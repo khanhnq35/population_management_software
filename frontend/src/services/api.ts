@@ -144,6 +144,29 @@ export type FeeObligations = {
   unpaid: FeeObligationEntry[];
 };
 
+export type DashboardStats = {
+  total_expected: number;
+  total_collected: number;
+  total_outstanding: number;
+  completion_rate: number;
+  fees: Array<{
+    id: number;
+    name: string;
+    expected: number;
+    collected: number;
+    remaining: number;
+    completion_rate: number;
+  }>;
+  top_debtors: Array<{
+    household_code: string;
+    head_of_household: string;
+    fee_count: number;
+    expected: number;
+    paid: number;
+    remaining: number;
+  }>;
+};
+
 export type DashboardFilters = {
   from?: string;
   to?: string;
@@ -219,8 +242,10 @@ export const feesApi = {
   async stats() {
     const { data } = await apiClient.get("/thuphi/stats/summary/");
     return data;
-  },
-  async createPayment(feeId: number, payload: Record<string, unknown>) {
+  },  async dashboardStats(params?: { start_date?: string; end_date?: string; fee_id?: number }) {
+    const { data } = await apiClient.get<DashboardStats>("/thuphi/stats/dashboard", { params });
+    return data;
+  },  async createPayment(feeId: number, payload: Record<string, unknown>) {
     const { data } = await apiClient.post(`/thuphi/${feeId}/payments/`, payload);
     return data;
   },

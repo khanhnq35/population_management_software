@@ -337,6 +337,130 @@ def fee_statistics(db: Session = Depends(get_db)) -> dict[str, float]:
     }
 
 
+@router.get("/stats/dashboard")
+def dashboard_statistics(
+    db: Session = Depends(get_db),
+    start_date: str | None = Query(default=None),
+    end_date: str | None = Query(default=None),
+    fee_id: int | None = Query(default=None),
+) -> dict:
+    """Get comprehensive dashboard statistics"""
+    _ensure_fee_schema(db)
+    
+    from datetime import datetime as dt
+    from sqlalchemy import and_, case, distinct
+    
+    # Parse dates
+    start_dt = dt.fromisoformat(start_date) if start_date else None
+    end_dt = dt.fromisoformat(end_date) if end_date else None
+    
+    # Build payment query with filters
+    payment_query = db.query(Payment)
+    if start_dt:
+        payment_query = payment_query.filter(Payment.payment_date >= start_dt)
+    if end_dt:
+        payment_query = payment_query.filter(Payment.payment_date <= end_dt)
+    if fee_id:
+        payment_query = payment_query.filter(Payment.fee_id == fee_id)
+    
+    # Calculate totals
+    total_collected = payment_query.with_entities(func.sum(Payment.amount_paid)).scalar() or 0
+    
+    # Get fee statistics with collected amounts
+    fee_query = db.query(
+        ThuPhi.id,
+        ThuPhi.name,
+        ThuPhi.amount,
+        ThuPhi.collection_type,
+        func.coalesce(func.sum(Payment.amount_paid), 0).label("collected")
+    ).outerjoin(Payment, Payment.fee_id == ThuPhi.id)
+    
+    if start_dt or end_dt:
+        fee_query = fee_query.filter(
+            and_(
+                Payment.payment_date >= start_dt if start_dt else True,
+                Payment.payment_date <= end_dt if end_dt else True
+            ) if Payment.id != None else True
+        )
+    
+    if fee_id:
+        fee_query = fee_query.filter(ThuPhi.id == fee_id)
+    
+    fee_stats = fee_query.group_by(ThuPhi.id, ThuPhi.name, ThuPhi.amount, ThuPhi.collection_type).all()
+    
+    fees_list = []
+    total_expected = 0
+    for fee in fee_stats:
+        expected = float(fee.amount or 0)
+        collected = float(fee.collected or 0)
+        remaining = max(0, expected - collected)
+        completion = (collected / expected * 100) if expected > 0 else 0
+        
+        total_expected += expected
+        
+        fees_list.append({
+            "id": fee.id,
+            "name": fee.name,
+            "expected": expected,
+            "collected": collected,
+            "remaining": remaining,
+            "completion_rate": round(completion, 2)
+        })
+    
+    # Get top debtors by household
+    debtor_query = db.query(
+        HoGiaDinh.household_code,
+        HoGiaDinh.head_of_household,
+        func.count(distinct(ThuPhi.id)).label("fee_count"),
+        func.sum(ThuPhi.amount).label("total_expected"),
+        func.coalesce(func.sum(Payment.amount_paid), 0).label("total_paid")
+    ).outerjoin(
+        NhanKhau, NhanKhau.household_id == HoGiaDinh.id
+    ).outerjoin(
+        Payment, Payment.citizen_id == NhanKhau.id
+    ).outerjoin(
+        ThuPhi, ThuPhi.id == Payment.fee_id
+    )
+    
+    if fee_id:
+        debtor_query = debtor_query.filter(ThuPhi.id == fee_id)
+    
+    debtors = debtor_query.group_by(
+        HoGiaDinh.id, HoGiaDinh.household_code, HoGiaDinh.head_of_household
+    ).having(
+        func.sum(ThuPhi.amount) > func.coalesce(func.sum(Payment.amount_paid), 0)
+    ).order_by(
+        (func.sum(ThuPhi.amount) - func.coalesce(func.sum(Payment.amount_paid), 0)).desc()
+    ).limit(10).all()
+    
+    top_debtors = []
+    for debtor in debtors:
+        expected = float(debtor.total_expected or 0)
+        paid = float(debtor.total_paid or 0)
+        remaining = expected - paid
+        top_debtors.append({
+            "household_code": debtor.household_code,
+            "head_of_household": debtor.head_of_household,
+            "fee_count": debtor.fee_count,
+            "expected": expected,
+            "paid": paid,
+            "remaining": remaining
+        })
+    
+    # Overall completion rate
+    total_outstanding = max(0, total_expected - total_collected)
+    completion_rate = (total_collected / total_expected * 100) if total_expected > 0 else 0
+    
+    return {
+        "total_expected": float(total_expected),
+        "total_collected": float(total_collected),
+        "total_outstanding": float(total_outstanding),
+        "completion_rate": round(completion_rate, 2),
+        "fees": sorted(fees_list, key=lambda x: x["completion_rate"]),
+        "top_debtors": top_debtors
+    }
+
+
 @router.post("/import", status_code=status.HTTP_200_OK)
 def import_fees(
     file: UploadFile = File(...),
