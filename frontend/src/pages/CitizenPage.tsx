@@ -19,6 +19,7 @@ type Citizen = {
   relationship_to_head: string;
   birthplace?: string;
   nationality?: string;
+  national_id?: string;
   ethnicity?: string;
   occupation?: string;
   temporary_address?: string;
@@ -46,6 +47,12 @@ const relationshipLabels: Record<string, string> = {
   chau: "Cháu"
 };
 
+const statusLabels: Record<string, string> = {
+  thuong_tru: "Thường trú",
+  tam_tru: "Tạm trú",
+  tam_vang: "Tạm vắng"
+};
+
 const columns: Column<Citizen>[] = [
   { key: "citizen_code", header: "Mã nhân khẩu" },
   { key: "full_name", header: "Họ tên" },
@@ -53,7 +60,7 @@ const columns: Column<Citizen>[] = [
   { key: "relationship_to_head", header: "Quan hệ", render: (row) => relationshipLabels[row.relationship_to_head] || row.relationship_to_head },
   { key: "date_of_birth", header: "Ngày sinh" },
   { key: "gender", header: "Giới tính" },
-  { key: "status", header: "Trạng thái" },
+  { key: "status", header: "Trạng thái", render: (row) => statusLabels[row.status] || row.status },
   { key: "occupation", header: "Nghề nghiệp" }
 ];
 
@@ -207,7 +214,7 @@ const CitizenPage = () => {
               }
             }}
             onSubmit={async (formData, close) => {
-              const payload = Object.fromEntries(formData.entries()) as Record<string, unknown>;
+              const payload = Object.fromEntries(formData.entries()) as Record<string, any>;
               if (!payload.household_id) {
                 alert("Vui lòng chọn hộ gia đình.");
                 throw new Error("household_id missing");
@@ -386,19 +393,19 @@ const CitizenEditModal = ({ citizen, householdOptions, onUpdate, onDelete }: Cit
       triggerLabel="Chỉnh sửa"
       triggerButtonProps={{ variant: "outline", size: "sm" }}
       onSubmit={async (formData, close) => {
-        const payload = Object.fromEntries(formData.entries());
-        if (!payload.household_id) {
-          alert("Vui lòng chọn hộ gia đình.");
-          throw new Error("household_id missing");
-        }
-        payload.household_id = Number(payload.household_id);
-        if (!payload.occupation) delete payload.occupation;
-        if (!payload.temporary_address) delete payload.temporary_address;
-        if (!payload.birthplace) delete payload.birthplace;
-        if (!payload.ethnicity) delete payload.ethnicity;
-        if (!payload.national_id) delete payload.national_id;
-        await onUpdate(citizen.id, payload);
-        close();
+      const payload = Object.fromEntries(formData.entries()) as Record<string, any>; 
+      if (!payload.household_id) {
+        alert("Vui lòng chọn hộ gia đình.");
+        throw new Error("household_id missing");
+      }
+      payload.household_id = Number(payload.household_id);
+      if (!payload.occupation) delete payload.occupation;
+      if (!payload.temporary_address) delete payload.temporary_address;
+      if (!payload.birthplace) delete payload.birthplace;
+      if (!payload.ethnicity) delete payload.ethnicity;
+      if (!payload.national_id) delete payload.national_id;
+      await onUpdate(citizen.id, payload);
+      close();
       }}
     >
       {({ close }) => (
