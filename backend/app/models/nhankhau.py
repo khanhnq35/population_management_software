@@ -17,7 +17,7 @@ class NhanKhau(Base):
     full_name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
     gender: Mapped[str] = mapped_column(String(16), nullable=False)
-    national_id: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True)
+    national_id: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     household_id: Mapped[int] = mapped_column(ForeignKey("hogiadinh.id", ondelete="CASCADE"), nullable=False, index=True)
     household_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     relationship_to_head: Mapped[str] = mapped_column(Enum(*RELATIONSHIP_CHOICES, name="relationship_enum"), default="chu_ho", nullable=False)

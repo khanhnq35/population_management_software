@@ -266,7 +266,6 @@ const CitizenPage = () => {
               if (!payload.temporary_address) delete payload.temporary_address;
               if (!payload.birthplace) delete payload.birthplace;
               if (!payload.ethnicity) delete payload.ethnicity;
-              if (!payload.national_id) delete payload.national_id;
               await citizensApi.create(payload);
               await fetchCitizens(debouncedSearch);
               close();
@@ -363,10 +362,11 @@ const CitizenPage = () => {
                 />
               </label>
               <label className="text-sm text-slate-300">
-                CMND/CCCD
+                CMND/CCCD *
                 <input
                   name="national_id"
                   className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+                  required
                 />
               </label>
               <label className="text-sm text-slate-300 md:col-span-2">
@@ -552,7 +552,6 @@ const CitizenEditModal = ({ citizen, householdOptions, onUpdate, onDelete }: Cit
       if (!payload.temporary_address) delete payload.temporary_address;
       if (!payload.birthplace) delete payload.birthplace;
       if (!payload.ethnicity) delete payload.ethnicity;
-      if (!payload.national_id) delete payload.national_id;
       await onUpdate(citizen.id, payload);
       close();
       }}
@@ -654,11 +653,12 @@ const CitizenEditModal = ({ citizen, householdOptions, onUpdate, onDelete }: Cit
             />
           </label>
           <label className="text-sm text-slate-300">
-            CMND/CCCD
+            CMND/CCCD *
             <input
               name="national_id"
               defaultValue={citizen.national_id ?? ""}
               className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
+              required
             />
           </label>
           <label className="text-sm text-slate-300 md:col-span-2">
