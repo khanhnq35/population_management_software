@@ -9,7 +9,7 @@ class NhanKhauBase(BaseModel):
     full_name: str = Field(..., min_length=3, max_length=128)
     date_of_birth: date
     gender: str = Field(..., pattern="^(Nam|Nu|Khac|nam|nu|khac)$")
-    national_id: Optional[str] = Field(default=None, max_length=20)
+    national_id: str = Field(..., min_length=1, max_length=20)
     household_id: int
     household_code: Optional[str] = Field(default=None, max_length=50)
     relationship_to_head: Literal["chu_ho", "bo", "me", "ong", "ba", "anh", "chi", "em", "chong", "vo", "con", "chau"] = "chu_ho"
