@@ -579,6 +579,12 @@ const FeePage = () => {
                             throw new Error("Vui lòng chọn người nộp.");
                           }
                           await feesApi.createPayment(selectedFee.id, payload);
+                          const updatedFees = await feesApi.list();
+                          setFees(updatedFees);
+                          const updatedSelectedFee = updatedFees.find((fee) => fee.id === selectedFee.id);
+                          if (updatedSelectedFee) {
+                            setSelectedFee(updatedSelectedFee);
+                          }
                           await loadPayments(selectedFee.id);
                           resetPaymentForm();
                           clearError();
